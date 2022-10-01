@@ -8,7 +8,7 @@ function Run(wasm){
     WebAssembly.instantiate(wasm, {}).then(
         (obj) => {
             ctx.fillStyle = 'white';
-            ctx.fillText("Result: "+obj.instance.exports.run(), 0, 80);
+            ctx.fillText("Result: "+obj.instance.exports.run(), 0, 400);
         }
     );
 }
@@ -284,7 +284,7 @@ function Parse(tokens){
         var minPrecedence = Number.MAX_VALUE;
         var minIndex = -1;
         var minOp = undefined;
-        for(var i=tokens.length-1;i>=0;i--){
+        for(var i=0;i<tokens.length-1;i++){
             if(tokens[i].type == 'operator'){
                 var precedence = Precedence(tokens[i].value);
                 if(precedence<minPrecedence){
@@ -296,7 +296,7 @@ function Parse(tokens){
         }
         var noOpPrecedence = 4;
         if(minPrecedence>noOpPrecedence){
-            for(var i=tokens.length-2;i>=0;i--){
+            for(var i=0;i<tokens.length-1;i++){
                 if(tokens[i].type != 'operator' && tokens[i+1].type != 'operator'){
                     return {index:i, operator:''};
                 }
@@ -308,7 +308,7 @@ function Parse(tokens){
     function RemoveWhitespace(tokens){
         var result = [];
         for(var t of tokens){
-            if(t.type != 'whitespace')
+            if(t.type != 'Whitespace')
                 result.push(t);
         }
         return result;
@@ -375,7 +375,7 @@ function Tokenize(code){
     }
 
     function TokenizeWhitespace(value){
-        var token = {type:"whitespace", value:value, start:index, end:index+value.length};
+        var token = {type:"Whitespace", value:value, start:index, end:index+value.length};
         index+=value.length;
         return token;
     }
@@ -422,6 +422,7 @@ function Tokenize(code){
             return TokenizeIdentifier();
         switch(c){
             case ' ': return TokenizeWhitespace(' ');
+            case '\n': return TokenizeWhitespace('\n');
             case '=': return TokenizeOperator('=');
             case '+': return TokenizeOperator('+');
             case '-': return TokenizeOperator('-');
@@ -445,11 +446,13 @@ function CodeEditor(){
     var lastCode = "";
     var code = "";
     var fontSize = 20;
+    var lineSize = fontSize*1.3;
 
     function Update(){
         try{
             var tokens = Tokenize(code);
             var x = 0;
+            var y = 0;
             ctx.fillStyle = 'black';
             ctx.fillRect(0,0,canvas.width,canvas.height);
             ctx.font = fontSize+'px Arial';
@@ -458,15 +461,22 @@ function CodeEditor(){
                 if(t.type == 'Whitespace'){
                     if(t.value == ' ')
                         x+=ctx.measureText(' ').width;
+                    else if(t.value == '\n'){
+                        x=0;
+                        y+=lineSize;
+                    }
                 }
                 else{
                     if(t.type == 'Float' || t.type == 'Int'){
                         ctx.fillStyle = 'rgb(100,200,255)';
                     }
+                    else if(t.type == 'Identifier'){
+                        ctx.fillStyle = 'rgb(100,255,200)'
+                    }
                     else{
                         ctx.fillStyle = 'white';
                     }
-                    ctx.fillText(t.value, x, fontSize);
+                    ctx.fillText(t.value, x, y+fontSize);
                     x+=ctx.measureText(t.value).width;
                 }
             }
@@ -494,6 +504,9 @@ function CodeEditor(){
         else if(e.key == 'Backspace'){
             if(code.length>0)
                 code=code.substring(0, code.length-1)
+        }
+        else if(e.key == 'Enter'){
+            code+='\n';
         }
         else
             console.log(e.key);
