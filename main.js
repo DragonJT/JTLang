@@ -116,7 +116,8 @@ function Emit(ast){
         f32_sub: 0x93,
         f32_mul: 0x94,
         f32_div: 0x95,
-        i32_trunc_f32_s: 0xa8
+        i32_trunc_f32_s: 0xa8,
+        f32_convert_i32_s: 0xb2,
     }
 
     // http://webassembly.github.io/spec/core/binary/modules.html#export-section
@@ -167,6 +168,17 @@ function Emit(ast){
         '-': Opcode.f32_sub,
         '*': Opcode.f32_mul,
         '/': Opcode.f32_div,
+        '<': Opcode.f32_lt,
+        '>': Opcode.f32_gt,
+    }
+
+    const f32OperatorOutput = {
+        '+':Valtype.f32,
+        '-':Valtype.f32,
+        '*':Valtype.f32,
+        '/':Valtype.f32,
+        '<':Valtype.i32,
+        '>':Valtype.i32,
     }
 
     const typeSection = createSection(Section.type, encodeVector([funcType]));
@@ -190,7 +202,11 @@ function Emit(ast){
         var value = f32Operator[operator];
         if(value == undefined)
             throw "Unknown f32 operator:"+operator;
-        return value;
+        var output = f32OperatorOutput[operator];
+        if(output == Valtype.i32){
+            return [value, Opcode.f32_convert_i32_s];
+        }
+        return [value];
     }
 
     function EmitNode(node){
@@ -200,7 +216,7 @@ function Emit(ast){
                 //return [Opcode.i32_const, ...unsignedLEB128(parseInt(node.value))];
                 return [Opcode.f32_const, ...ieee754(parseFloat(node.value))];
             case 'Float': return [Opcode.f32_const, ...ieee754(parseFloat(node.value))];
-            case 'ExpressionAB': return [...EmitNode(node.a), ...EmitNode(node.b), EmitOperator(Valtype.f32, node.value)];
+            case 'ExpressionAB': return [...EmitNode(node.a), ...EmitNode(node.b), ...EmitOperator(Valtype.f32, node.value)];
             case 'SetLocal': return [...EmitNode(node.b), Opcode.set_local, ...unsignedLEB128(node.a.local.id)];
             case 'MultiLine': return [...EmitNode(node.a), ...EmitNode(node.b)];
             default: throw "Unknown node type:"+node.type;
@@ -264,7 +280,9 @@ function Emit(ast){
 function Parse(tokens){
     function Precedence(op){
         switch(op){
-            case '=': return 3;
+            case '=': return 4;
+            case '<': return 3;
+            case '>': return 3;
             case '+': return 2;
             case '-': return 2;
             case '*': return 1;
@@ -294,7 +312,7 @@ function Parse(tokens){
                 }
             }
         }
-        var noOpPrecedence = 4;
+        var noOpPrecedence = 5;
         if(minPrecedence>noOpPrecedence){
             for(var i=0;i<tokens.length-1;i++){
                 if(tokens[i].type != 'operator' && tokens[i+1].type != 'operator'){
@@ -428,6 +446,8 @@ function Tokenize(code){
             case '-': return TokenizeOperator('-');
             case '*': return TokenizeOperator('*');
             case '/': return TokenizeOperator('/');
+            case '<': return TokenizeOperator('<');
+            case '>': return TokenizeOperator('>');
             case '\0': return {type:'EOF'};
         }
         throw "Cant tokenize:"+c;
