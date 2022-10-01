@@ -195,17 +195,57 @@ function Emit(ast){
 
     function EmitNode(node){
         switch(node.type){
+            case 'Identifier': return [Opcode.get_local, ...unsignedLEB128(node.local.id)];
             case 'Int': 
                 //return [Opcode.i32_const, ...unsignedLEB128(parseInt(node.value))];
                 return [Opcode.f32_const, ...ieee754(parseFloat(node.value))];
             case 'Float': return [Opcode.f32_const, ...ieee754(parseFloat(node.value))];
             case 'ExpressionAB': return [...EmitNode(node.a), ...EmitNode(node.b), EmitOperator(Valtype.f32, node.value)];
+            case 'SetLocal': return [...EmitNode(node.b), Opcode.set_local, ...unsignedLEB128(node.a.local.id)];
+            case 'MultiLine': return [...EmitNode(node.a), ...EmitNode(node.b)];
             default: throw "Unknown node type:"+node.type;
         }
     }
 
+    function FindLocals(locals, node){
+
+        function AddLocal(name){
+            var local = locals.find(l=>l.name == name);
+            if(local == undefined){
+                local = {name:name};
+                locals.push(local);
+            }
+            return local;
+        }
+
+        switch(node.type){
+            case 'Identifier': node.local = AddLocal(node.value); break;
+            case 'Int': break;
+            case 'Float': break;
+            case 'ExpressionAB':
+                FindLocals(locals, node.a); 
+                FindLocals(locals, node.b);
+                break; 
+            case 'SetLocal':
+                FindLocals(locals, node.a);
+                FindLocals(locals, node.b);
+                break;
+            case 'MultiLine':
+                FindLocals(locals, node.a);
+                FindLocals(locals, node.b);
+                break;
+        }
+        return locals;
+    }
+
+
     function EmitFunction(ast){
-        return encodeVector([emptyArray, ...EmitNode(ast), Opcode.end])
+        var locals = [];
+        FindLocals(locals, ast);
+        for(var i=0;i<locals.length;i++)
+            locals[i].id = i;
+        var encodeLocals = locals.length > 0 ? [encodeLocal(locals.length, Valtype.f32)] : [];        
+        return encodeVector([ ...encodeVector(encodeLocals), ...EmitNode(ast), Opcode.end])
     }
 
     const codeSection = createSection(Section.code, encodeVector([EmitFunction(ast)]));
@@ -224,6 +264,7 @@ function Emit(ast){
 function Parse(tokens){
     function Precedence(op){
         switch(op){
+            case '=': return 3;
             case '+': return 2;
             case '-': return 2;
             case '*': return 1;
@@ -232,25 +273,45 @@ function Parse(tokens){
         throw "operator not found: "+op;
     }
 
+    function ASTType(op){
+        switch(op){
+            case '=': return "SetLocal";
+            default: return "ExpressionAB";
+        }
+    }
+
     function FindNextOperator(tokens){
         var minPrecedence = Number.MAX_VALUE;
         var minIndex = -1;
-        for(var i=1;i<tokens.length-1;i++){
+        var minOp = undefined;
+        for(var i=tokens.length-1;i>=0;i--){
             if(tokens[i].type == 'operator'){
                 var precedence = Precedence(tokens[i].value);
                 if(precedence<minPrecedence){
                     minPrecedence = precedence;
                     minIndex = i;
+                    minOp = tokens[i].value;
                 }
             }
         }
-        return minIndex;
+        var noOpPrecedence = 4;
+        if(minPrecedence>noOpPrecedence){
+            for(var i=tokens.length-2;i>=0;i--){
+                if(tokens[i].type != 'operator' && tokens[i+1].type != 'operator'){
+                    return {index:i, operator:''};
+                }
+            }
+        }
+        return {index:minIndex, operator:minOp};
     }
 
-    function GetValue(token){
-        if(token.type == 'Float' || token.type == 'Int' || token.type == 'ExpressionAB')
-            return token;
-        throw "Expecting value type, got:"+token;
+    function RemoveWhitespace(tokens){
+        var result = [];
+        for(var t of tokens){
+            if(t.type != 'whitespace')
+                result.push(t);
+        }
+        return result;
     }
 
     function ReplaceOperator(tokens, index, value){
@@ -261,20 +322,33 @@ function Parse(tokens){
         return result;
     }
 
+    function ReplaceEmptyOperator(tokens, index, value){
+        var result = [];
+        result.push(...tokens.slice(0, index));
+        result.push(value);
+        result.push(...tokens.slice(index+2));
+        return result;
+    }
+
     function ParseExpression(tokens){
         while(tokens.length>1){
-            var index = FindNextOperator(tokens);
+            var op = FindNextOperator(tokens);
+            var index = op.index;
             if(index==-1){
                 console.log("cant parse:",tokens);
                 throw "cant parse expression:"+tokens;
             }
-            var a = GetValue(tokens[index-1]);
-            var b = GetValue(tokens[index+1]);
-            tokens = ReplaceOperator(tokens, index, {type:'ExpressionAB', value:tokens[index].value, a:a, b:b});
+            if(op.operator == ''){
+                tokens = ReplaceEmptyOperator(tokens, index, {type:'MultiLine', a:tokens[index], b:tokens[index+1] });
+            }
+            else{
+                tokens = ReplaceOperator(tokens, index, {type:ASTType(op.operator), value:tokens[index].value, a:tokens[index-1], b:tokens[index+1]});
+            }
         }
         return tokens[0];
     }
 
+    tokens = RemoveWhitespace(tokens);
     return ParseExpression(tokens);
 }
 
@@ -286,12 +360,22 @@ function Tokenize(code){
         return c>='0' && c<='9';
     }
 
+    function IsCharacter(c){
+        return (c>='a' && c<='z') || (c>='A' && c<='Z') || (c=='_');
+    }
+
     function CreateToken(type, start){
          return {type:type, value:code.substring(start, index), start:start, end:index};
     }
 
     function TokenizeOperator(value){
         var token = {type:"operator", value:value, start:index, end:index+value.length};
+        index+=value.length;
+        return token;
+    }
+
+    function TokenizeWhitespace(value){
+        var token = {type:"whitespace", value:value, start:index, end:index+value.length};
         index+=value.length;
         return token;
     }
@@ -318,11 +402,27 @@ function Tokenize(code){
         }
     }
 
+    function TokenizeIdentifier(){
+        var start = index;
+        while(true){
+            if(IsCharacter(code[index])){
+                index++;
+            }
+            else{
+                return CreateToken('Identifier', start);
+            }
+        }
+    }
+
     function NextToken(){
         var c = code[index];
         if(IsDigit(c))
             return TokenizeNumber();
+        if(IsCharacter(c))
+            return TokenizeIdentifier();
         switch(c){
+            case ' ': return TokenizeWhitespace(' ');
+            case '=': return TokenizeOperator('=');
             case '+': return TokenizeOperator('+');
             case '-': return TokenizeOperator('-');
             case '*': return TokenizeOperator('*');
@@ -355,18 +455,25 @@ function CodeEditor(){
             ctx.font = fontSize+'px Arial';
 
             for(var t of tokens){
-                if(t.type == 'Float' || t.type == 'Int'){
-                    ctx.fillStyle = 'rgb(100,200,255)';
+                if(t.type == 'Whitespace'){
+                    if(t.value == ' ')
+                        x+=ctx.measureText(' ').width;
                 }
                 else{
-                    ctx.fillStyle = 'white';
+                    if(t.type == 'Float' || t.type == 'Int'){
+                        ctx.fillStyle = 'rgb(100,200,255)';
+                    }
+                    else{
+                        ctx.fillStyle = 'white';
+                    }
+                    ctx.fillText(t.value, x, fontSize);
+                    x+=ctx.measureText(t.value).width;
                 }
-                ctx.fillText(t.value, x, fontSize);
-                x+=ctx.measureText(t.value).width;
             }
             lastCode = code;
             try{
                 var ast = Parse(tokens);
+                console.log(ast);
                 var wasm = Emit(ast);
                 Run(wasm);
             }
