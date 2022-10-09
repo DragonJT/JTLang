@@ -30,6 +30,7 @@ button.onclick = ()=>{
 var textarea = document.createElement('textarea');
 textarea.rows = '20';
 textarea.cols = '100';
+textarea.style.tabSize = '4';
 textarea.value = code;
 textarea.addEventListener('keydown', (e)=>{
     if (e.key == 'Tab') {
@@ -44,5 +45,3 @@ textarea.addEventListener('keydown', (e)=>{
     }
 });
 document.body.appendChild(textarea);
-
-
