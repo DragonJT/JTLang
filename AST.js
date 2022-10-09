@@ -230,8 +230,8 @@ class AST{
     } 
 
     CalcCalls(){
-        var functions = ast.body.filter(b=>b.constructor.name == 'ASTFunction');
-        var importFunctions = ast.body.filter(b=>b.constructor.name == 'ASTImportFunction');
+        var functions = this.body.filter(b=>b.constructor.name == 'ASTFunction');
+        var importFunctions = this.body.filter(b=>b.constructor.name == 'ASTImportFunction');
 
         var funcs = new Map();
         for(var f of importFunctions)
@@ -245,7 +245,6 @@ class AST{
                 if(id == undefined)
                     throw "Calling Unknown function: "+n.name;
                 n.funcID = id;
-                console.log(n.name, n.funcID);
             }
         }
     }

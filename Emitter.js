@@ -1,3 +1,5 @@
+//copied quite a lot from https://github.com/ColinEberhardt/chasm
+
 // https://webassembly.github.io/spec/core/binary/instructions.html
 const Opcode = {
     block: 0x02,
@@ -78,7 +80,6 @@ const unsignedLEB128 = (n) => {
 };
 
 function EmitAndRun(ast){
-    //copied quite a lot from https://github.com/ColinEberhardt/chasm
     var functions = ast.body.filter(b=>b.constructor.name == 'ASTFunction');
     var importFunctions = ast.body.filter(b=>b.constructor.name == 'ASTImportFunction');
     ast.CalcCalls();

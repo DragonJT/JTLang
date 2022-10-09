@@ -176,7 +176,6 @@ function ParseExpression(tokens){
         stack.push(new ASTComma(a,b));
     }
 
-    console.log(output);
     for(var t of output){
         switch(t.type){
             case TokenType.Call: CreateCall(t.value); break;
