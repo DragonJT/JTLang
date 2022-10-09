@@ -30,7 +30,6 @@ button.onclick = ()=>{
 var textarea = document.createElement('textarea');
 textarea.rows = '20';
 textarea.cols = '100';
-textarea.style.tabSize = '4';
 textarea.value = code;
 textarea.addEventListener('keydown', (e)=>{
     if (e.key == 'Tab') {
@@ -38,10 +37,10 @@ textarea.addEventListener('keydown', (e)=>{
         var start = textarea.selectionStart;
         var end = textarea.selectionEnd;
     
-        textarea.value = textarea.value.substring(0, start) + "\t" + textarea.value.substring(end);
+        textarea.value = textarea.value.substring(0, start) + "    " + textarea.value.substring(end);
     
         textarea.selectionStart =
-        textarea.selectionEnd = start + 1;
+        textarea.selectionEnd = start + 4;
     }
 });
 document.body.appendChild(textarea);
