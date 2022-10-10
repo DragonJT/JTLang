@@ -109,6 +109,15 @@ function Parser(reader){
         return new ASTFunction(name, args, returnType, body);
     }
 
+    function ParseImportFunction(){
+        reader.Scan();
+        var returnType = Expect(TokenType.Identifier);
+        var name = Expect(TokenType.Identifier);
+        var args = ParseArgs();
+        var body = Expect(TokenType.Javascript);
+        return new ASTImportFunction(name, args, returnType, body);
+    }
+
     function ParseAST(){
         var body = [];
         while(true){
@@ -116,6 +125,7 @@ function Parser(reader){
                 return new AST(body);
             switch(reader.current.type){
                 case TokenType.Identifier: body.push(ParseFunction()); break;
+                case 'import': body.push(ParseImportFunction()); break;
                 default: Error(TokenType.Identifier);
             }
         }

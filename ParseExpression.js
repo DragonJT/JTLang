@@ -53,7 +53,7 @@ function ParseExpression(tokens){
     function Term(type){
         switch(type){
             case TokenType.Call: return TermType.Call;
-            case TokenType.EmptyCall: return TermType.Operand;
+            case TokenType.EmptyCall: return TermType.Call;
             case TokenType.Identifier: return TermType.Operand;
             case TokenType.Int: return TermType.Operand;
             case TokenType.Float: return TermType.Operand;
@@ -138,7 +138,8 @@ function ParseExpression(tokens){
                     else
                         output.push(stack.pop());
                 }
-                if(stack[stack.length-1].type == TokenType.Call){
+                var top = stack[stack.length-1];
+                if(top.type == TokenType.Call || top.type == TokenType.EmptyCall){
                     output.push(stack.pop());
                 }
                 break;

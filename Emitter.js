@@ -79,7 +79,7 @@ const unsignedLEB128 = (n) => {
     return buffer;
 };
 
-function EmitAndRun(ast){
+function EmitAndRun(ast, output){
     var functions = ast.body.filter(b=>b.constructor.name == 'ASTFunction');
     var importFunctions = ast.body.filter(b=>b.constructor.name == 'ASTImportFunction');
     ast.CalcCalls();
@@ -209,11 +209,21 @@ function EmitAndRun(ast){
     }
 
     function ImportObject(){
-        var importObject = {env:{}};
+        var code = "var importObject = {env:{}};\n";
+        code+="var global = {};\n";
         for(var f of importFunctions){
-            importObject.env[f.name] = new Function(...f.args.map(a=>a.name), f.body);
+            code+="importObject.env."+f.name+"= (";
+            for(var i=0;i<f.args.length;i++){
+                code+=f.args[i].name;
+                if(i<f.args.length-1)
+                    code+=',';
+            }
+            code+=")=>{"
+            code+=f.body;
+            code+="};\n";
         }
-        return importObject;
+        code+="return importObject;\n"
+        return new Function('output', code)(output);
     }
 
     function EmitFunction(f){
@@ -238,9 +248,7 @@ function EmitAndRun(ast){
 
     WebAssembly.instantiate(wasm, ImportObject()).then(
         (obj) => {
-            var div = document.createElement('div');
-            div.innerHTML = obj.instance.exports.main();
-            document.body.appendChild(div);
+            obj.instance.exports.main();
         }
     );
 }

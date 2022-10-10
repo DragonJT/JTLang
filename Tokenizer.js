@@ -4,6 +4,7 @@ const TokenType = {
     Identifier:'Identifier',
     Float:'Float',
     Int:'Int',
+    Javascript:'Javascript',
 };
 
 class Token{
@@ -17,7 +18,7 @@ function Tokenizer(code){
     var index = 0;
     var charTokens = new Set(['=','+','-','*','/','<','>',';','(',')','{','}',',']);
     var char2Tokens = new Set(['++']);
-    var keywords = new Set(['if', 'while', 'for', 'return']);
+    var keywords = new Set(['if', 'while', 'for', 'return', 'import']);
 
     function IsDigit(c){
         return c>='0' && c<='9';
@@ -83,6 +84,19 @@ function Tokenizer(code){
             return undefined;
     }
 
+    function TokenizeJavascript(){
+        var start = index;
+        while(index<code.length){
+            var c2 = code.substring(index, index+2);
+            if(c2=='}#'){
+                index+=2;
+                return new Token(TokenType.Javascript, code.substring(start+2, index-2));
+            }
+            index++;
+        }
+        throw "Expecing }# at end of javascript";
+    }
+
     function NextToken(){
         while(true){
             var c = code[index];
@@ -97,6 +111,10 @@ function Tokenizer(code){
                 case '\n': index++; continue;
                 case '\t': index++; continue;
                 case '\r': index++; continue;
+            }
+            var c2 = code.substring(index, index+2);
+            if(c2 == '#{'){
+                return TokenizeJavascript();
             }
             var token = TryCreateToken(char2Tokens, index, index+2);
             if(token!=undefined)
@@ -117,9 +135,10 @@ function Tokenizer(code){
     }
 }
 
-function CompileAndRun(code){
+function CompileAndRun(code, output){
+    output.innerHTML = '';
     var tokens = Tokenizer(code);
     var ast = Parser(new TokenReader(tokens));
-    EmitAndRun(ast);
+    EmitAndRun(ast, output);
 }
 
