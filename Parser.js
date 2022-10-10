@@ -79,19 +79,37 @@ function Parser(reader){
         }
     }
 
+    function ParseIf(){
+        Expect('if');
+        Expect('(');
+        var expression = ParseExpression(ParseExpressionTokens(')'));
+        var body = ParseStatement();
+        return new ASTIf(expression, body);
+    }
+
+    function ParseWhile(){
+        Expect('while');
+        Expect('(');
+        var expression = ParseExpression(ParseExpressionTokens(')'));
+        var body = ParseStatement();
+        return new ASTWhile(expression, body);
+    }
+
     function ParseStatement(){
         NotExpectingEndOfInput('statement');
         switch(reader.current.type){
             case '{': return ParseBody();
-            default: return ParseExpression(ParseExpressionTokens());
+            case 'if': return ParseIf();
+            case 'while': return ParseWhile();
+            default: return ParseExpression(ParseExpressionTokens(';'));
         }
     }
 
-    function ParseExpressionTokens(){
+    function ParseExpressionTokens(end){
         var start = reader.index;
         while(true){
-            NotExpectingEndOfInput(';')
-            if(reader.current.type == ';'){
+            NotExpectingEndOfInput(end)
+            if(reader.current.type == end){
                 var tokens = reader.tokens.slice(start, reader.index);
                 reader.Scan();
                 return tokens;

@@ -57,6 +57,8 @@ function ParseExpression(tokens){
             case TokenType.Identifier: return TermType.Operand;
             case TokenType.Int: return TermType.Operand;
             case TokenType.Float: return TermType.Operand;
+            case '++': return TermType.UnaryPostfixOperator;
+            case '--': return TermType.UnaryPostfixOperator
             case '=': return TermType.Operator;
             case '+': return TermType.Operator;
             case '-': return TermType.Operator;
@@ -67,6 +69,8 @@ function ParseExpression(tokens){
             case '(': return TermType.LeftParenthesis;
             case ')': return TermType.RightParenthesis;
             case ',': return TermType.Operator;
+            case '<': return TermType.Operator;
+            case '>': return TermType.Operator;
             default: throw "Type defaulted:"+type;
         }
     }
@@ -77,18 +81,24 @@ function ParseExpression(tokens){
             case '(': return 1;
             case ')': return 1;
             case ',': return 1;
-            case '+': return 2;
-            case '-': return 2;
-            case 'p': return 3;
-            case 'm': return 3;
-            case '*': return 4;
-            case '/': return 4;
+            case '<': return 2;
+            case '>': return 2;
+            case '+': return 3;
+            case '-': return 3;
+            case 'p': return 4;
+            case 'm': return 4;
+            case '*': return 5;
+            case '/': return 5;
+            case '++': return 6;
+            case '--': return 6;
             default: throw "Precedence defaulted:"+type;
         }
     }
 
     function Associative(type){
         switch(type){
+            case '++': return AssociativeType.Left;
+            case '--': return AssociativeType.Left;
             case '=': return AssociativeType.Left;
             case '+': return AssociativeType.Left;
             case '-': return AssociativeType.Left;
@@ -97,6 +107,8 @@ function ParseExpression(tokens){
             case '*': return AssociativeType.Left;
             case '/': return AssociativeType.Left;
             case ',': return AssociativeType.Left;
+            case '<': return AssociativeType.Left;
+            case '>': return AssociativeType.Left;
             default: throw "Associative defaulted:"+type;
         }
     }
@@ -191,6 +203,10 @@ function ParseExpression(tokens){
             case '-': CreateBinaryOp('-'); break;
             case 'm': CreateUnaryOp('m'); break;
             case 'p': CreateUnaryOp('p'); break;
+            case '++': CreateUnaryOp('++'); break;
+            case '--': CreateUnaryOp('--'); break;
+            case '<': CreateBinaryOp('<'); break;
+            case '>': CreateBinaryOp('>'); break;
             case ',': CreateComma(); break;
             default: throw "opcodes defaulted:"+t.type;
         }

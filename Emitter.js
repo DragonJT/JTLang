@@ -79,6 +79,11 @@ const unsignedLEB128 = (n) => {
     return buffer;
 };
 
+// https://webassembly.github.io/spec/core/binary/types.html#binary-blocktype
+const Blocktype = {
+    void: 0x40
+}
+
 function EmitAndRun(ast, output){
     var functions = ast.body.filter(b=>b.constructor.name == 'ASTFunction');
     var importFunctions = ast.body.filter(b=>b.constructor.name == 'ASTImportFunction');
@@ -102,12 +107,6 @@ function EmitAndRun(ast, output){
         code: 10,
         data: 11
     };
-
-
-    // https://webassembly.github.io/spec/core/binary/types.html#binary-blocktype
-    const Blocktype = {
-        void: 0x40
-    }
 
     // http://webassembly.github.io/spec/core/binary/modules.html#export-section
     const ExportType = {

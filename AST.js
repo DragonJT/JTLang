@@ -73,6 +73,8 @@ class ASTBinaryOP{
             case '/': wasm.push(Opcode.f32_div); break;
             case '+': wasm.push(Opcode.f32_add); break;
             case '-': wasm.push(Opcode.f32_sub); break;
+            case '<': wasm.push(Opcode.f32_lt); break;
+            case '>': wasm.push(Opcode.f32_gt); break;
             default: throw "BinaryOp defaulted: "+this.op;
         }
     }
@@ -127,16 +129,89 @@ class ASTUnaryOp{
     }
 
     Emit(wasm){
-        this.expression.Emit(wasm);
         switch(this.op){
             case 'p': break;
-            case 'm': wasm.push(Opcode.f32_neg); break;
+            case 'm': 
+                this.expression.Emit(wasm);
+                wasm.push(Opcode.f32_neg);
+                break;
+            case '++':
+                var localID = this.expression.localID;
+                if(localID == undefined)
+                    throw "Expecting localID for ++";
+                wasm.push(Opcode.get_local, ...unsignedLEB128(localID));
+                wasm.push(Opcode.f32_const, ...ieee754(1));
+                wasm.push(Opcode.f32_add);
+                wasm.push(Opcode.set_local, ...unsignedLEB128(localID));
+                break;
+            case '--':
+                var localID = this.expression.localID;
+                if(localID == undefined)
+                    throw "Expecting localID for --";
+                wasm.push(Opcode.get_local, ...unsignedLEB128(localID));
+                wasm.push(Opcode.f32_const, ...ieee754(1));
+                wasm.push(Opcode.f32_sub);
+                wasm.push(Opcode.set_local, ...unsignedLEB128(localID));
+                break;
             default: throw "UnaryOp defaulted: "+this.op;
         }
     }
 
     Traverse(nodes){
         this.expression.Traverse(nodes);
+        nodes.push(this);
+    }
+}
+
+class ASTIf{
+    constructor(expression, body){
+        this.expression = expression;
+        this.body = body;
+    }
+
+    Emit(wasm){
+        wasm.push(Opcode.block);
+        wasm.push(Blocktype.void);
+        this.expression.Emit(wasm);
+        wasm.push(Opcode.i32_eqz);
+        wasm.push(Opcode.br_if);
+        wasm.push(...signedLEB128(0));
+        this.body.Emit(wasm);
+        wasm.push(Opcode.end);
+    }
+
+    Traverse(nodes){
+        this.expression.Traverse(nodes);
+        this.body.Traverse(nodes);
+        nodes.push(this);
+    }
+}
+
+class ASTWhile{
+    constructor(expression, body){
+        this.expression = expression;
+        this.body = body;
+    }
+
+    Emit(wasm){
+        wasm.push(Opcode.block);
+        wasm.push(Blocktype.void);
+        wasm.push(Opcode.loop);
+        wasm.push(Blocktype.void);
+        this.expression.Emit(wasm);
+        wasm.push(Opcode.i32_eqz);
+        wasm.push(Opcode.br_if);
+        wasm.push(...signedLEB128(1));
+        this.body.Emit(wasm);
+        wasm.push(Opcode.br);
+        wasm.push(...signedLEB128(0));
+        wasm.push(Opcode.end);
+        wasm.push(Opcode.end);
+    }
+
+    Traverse(nodes){
+        this.expression.Traverse(nodes);
+        this.body.Traverse(nodes);
         nodes.push(this);
     }
 }

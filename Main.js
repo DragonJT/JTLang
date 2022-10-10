@@ -1,5 +1,4 @@
 var code = `
-
 import void CreateCtx() #{
     var canvas = document.createElement('canvas');
     output.appendChild(canvas);
@@ -33,8 +32,17 @@ void main(){
     DrawCircle(150,175,50,0,1,0);
     DrawCircle(200,175,25,0,0,1);
     DrawCircle(250,100,75,1,1,0);
-    x=-Test(4,3)*Test(2,6);
-    DrawFloat(100,100,x);
+    while(x<10){
+        DrawCircle(100+x*50,200,50,x/10,1,0);
+        x++;
+    }
+    x=0;
+    while(x<10){
+        DrawCircle(100+x*50,300,50,0,x/10,1);
+        x++;
+    }
+    y=3+-4*5;
+    DrawFloat(100,100,y);
 }
 `;
 
