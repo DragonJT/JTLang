@@ -79,6 +79,7 @@ function Parser(reader){
         }
     }
 
+
     function ParseIf(){
         Expect('if');
         Expect('(');
@@ -95,12 +96,23 @@ function Parser(reader){
         return new ASTWhile(expression, body);
     }
 
+    function ParseFor(){
+        Expect('for');
+        Expect('(');
+        var init = ParseExpression(ParseExpressionTokens(';'));
+        var condition = ParseExpression(ParseExpressionTokens(';'));
+        var post = ParseExpression(ParseExpressionTokens(')'));
+        var body = ParseStatement();
+        return new ASTFor(init, condition, post, body);
+    }
+
     function ParseStatement(){
         NotExpectingEndOfInput('statement');
         switch(reader.current.type){
             case '{': return ParseBody();
             case 'if': return ParseIf();
             case 'while': return ParseWhile();
+            case 'for': return ParseFor();
             default: return ParseExpression(ParseExpressionTokens(';'));
         }
     }

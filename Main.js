@@ -22,24 +22,18 @@ import void DrawFloat(f32 x, f32 y, f32 value) #{
     ctx.fillText(value, x, y);
 }#
 
-f32 Test(f32 a, f32 b){
-    a+b;
-}
-
 void main(){
     CreateCtx();
     DrawCircle(100,100,50,1,0,0);
     DrawCircle(150,175,50,0,1,0);
     DrawCircle(200,175,25,0,0,1);
     DrawCircle(250,100,75,1,1,0);
-    while(x<10){
+
+    for(x=0;x<10;x++){
         DrawCircle(100+x*50,200,50,x/10,1,0);
-        x++;
     }
-    x=0;
-    while(x<10){
+    for(x=0;x<10;x++){
         DrawCircle(100+x*50,300,50,0,x/10,1);
-        x++;
     }
     y=3+-4*5;
     DrawFloat(100,100,y);

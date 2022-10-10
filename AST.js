@@ -216,6 +216,41 @@ class ASTWhile{
     }
 }
 
+class ASTFor{
+    constructor(init, condition, post, body){
+        this.init = init;
+        this.condition = condition;
+        this.post = post;
+        this.body = body;
+    }
+
+    Emit(wasm){
+        this.init.Emit(wasm);
+        wasm.push(Opcode.block);
+        wasm.push(Blocktype.void);
+        wasm.push(Opcode.loop);
+        wasm.push(Blocktype.void);
+        this.condition.Emit(wasm);
+        wasm.push(Opcode.i32_eqz);
+        wasm.push(Opcode.br_if);
+        wasm.push(...signedLEB128(1));
+        this.body.Emit(wasm);
+        this.post.Emit(wasm);
+        wasm.push(Opcode.br);
+        wasm.push(...signedLEB128(0));
+        wasm.push(Opcode.end);
+        wasm.push(Opcode.end);
+    }
+
+    Traverse(nodes){
+        this.init.Traverse(nodes);
+        this.condition.Traverse(nodes);
+        this.post.Traverse(nodes);
+        this.body.Traverse(nodes);
+        nodes.push(this);
+    }
+}
+
 class ASTCall{
     constructor(name, argExpression){
         this.name = name;
