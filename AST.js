@@ -303,7 +303,8 @@ class ASTImportFunction{
 }
 
 class ASTFunction{
-    constructor(name, args, returnType, body){
+    constructor(_export, name, args, returnType, body){
+        this._export = _export;
         this.name = name;
         this.args = args;
         this.returnType = returnType;
@@ -340,21 +341,25 @@ class AST{
     } 
 
     CalcCalls(){
-        var functions = this.body.filter(b=>b.constructor.name == 'ASTFunction');
         var importFunctions = this.body.filter(b=>b.constructor.name == 'ASTImportFunction');
-
+        var functions = this.body.filter(b=>b.constructor.name == 'ASTFunction');
+        for(var i=0;i<importFunctions.length;i++)
+            importFunctions[i].funcID = i;
+        for(var i=0;i<functions.length;i++)
+            functions[i].funcID = i+importFunctions.length;
+        
         var funcs = new Map();
         for(var f of importFunctions)
-            funcs.set(f.name, funcs.size);
+            funcs.set(f.name, f);
         for(var f of functions)
-            funcs.set(f.name, funcs.size);
+            funcs.set(f.name, f);
 
         for(var n of Traverse(this)){
             if(n.constructor.name == 'ASTCall' || n.constructor.name == 'ASTEmptyCall'){
-                var id = funcs.get(n.name);
-                if(id == undefined)
+                var f = funcs.get(n.name);
+                if(f == undefined)
                     throw "Calling Unknown function: "+n.name;
-                n.funcID = id;
+                n.funcID = f.funcID;
             }
         }
     }

@@ -1,10 +1,17 @@
 var code = `
-import void CreateCtx() #{
+import void Init() #{
     var canvas = document.createElement('canvas');
     output.appendChild(canvas);
     canvas.width = 800;
     canvas.height = 600;
     global.ctx = canvas.getContext('2d');
+    global.frame=0;
+}#
+
+import void DrawRect(f32 x, f32 y, f32 w, f32 h, f32 r, f32 g, f32 b) #{
+    var ctx = global.ctx;
+    ctx.fillStyle = 'rgb('+r*255+','+g*255+','+b*255+')';
+    ctx.fillRect(x,y,w,h);
 }#
 
 import void DrawCircle(f32 x, f32 y, f32 radius, f32 r, f32 g, f32 b) #{
@@ -22,21 +29,32 @@ import void DrawFloat(f32 x, f32 y, f32 value) #{
     ctx.fillText(value, x, y);
 }#
 
-void main(){
-    CreateCtx();
+import void CallNextUpdateFunc() #{
+    global.frame++;
+    requestAnimationFrame(()=>exports.Update(global.frame));
+}#
+
+export void Update(f32 frame){
+    DrawRect(0,0,800,600,0,0,0);
     DrawCircle(100,100,50,1,0,0);
     DrawCircle(150,175,50,0,1,0);
     DrawCircle(200,175,25,0,0,1);
     DrawCircle(250,100,75,1,1,0);
 
     for(x=0;x<10;x++){
-        DrawCircle(100+x*50,200,50,x/10,1,0);
+        DrawCircle(100+x*50,10+frame,50,x/10,1,0);
     }
     for(x=0;x<10;x++){
-        DrawCircle(100+x*50,300,50,0,x/10,1);
+        DrawCircle(100+x*50,40+frame,50,0,x/10,1);
     }
     y=3+-4*5;
     DrawFloat(100,100,y);
+    CallNextUpdateFunc();
+}
+
+export void main(){
+    Init();
+    CallNextUpdateFunc();
 }
 `;
 

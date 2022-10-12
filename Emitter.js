@@ -85,6 +85,7 @@ const Blocktype = {
 }
 
 function EmitAndRun(ast, output){
+    var exports = {};
     var functions = ast.body.filter(b=>b.constructor.name == 'ASTFunction');
     var importFunctions = ast.body.filter(b=>b.constructor.name == 'ASTImportFunction');
     ast.CalcCalls();
@@ -188,16 +189,14 @@ function EmitAndRun(ast, output){
 
     const funcSection = createSection(Section.func, EmitFuncs(functions));
 
-    const mainIndex = functions.findIndex(f=>f.name == "main") + importFunctions.length;
+    for(var f of functions){
+        if(f._export){
+            console.log(f);
+        }
+    }
     const exportSection = createSection(
         Section.export,
-        encodeVector([
-            [
-                ...encodeString("main"),
-                ExportType.func,
-                unsignedLEB128(mainIndex),
-            ]
-        ])
+        encodeVector(functions.filter((f)=>f._export).map(f=>[...encodeString(f.name), ExportType.func, ...unsignedLEB128(f.funcID)])),
     );
 
     function GetBlocktype(asm){
@@ -222,7 +221,7 @@ function EmitAndRun(ast, output){
             code+="};\n";
         }
         code+="return importObject;\n"
-        return new Function('output', code)(output);
+        return new Function('output', 'exports', code)(output, exports);
     }
 
     function EmitFunction(f){
@@ -247,6 +246,11 @@ function EmitAndRun(ast, output){
 
     WebAssembly.instantiate(wasm, ImportObject()).then(
         (obj) => {
+            for(var f of functions){
+                if(f._export){
+                    exports[f.name] = obj.instance.exports[f.name];
+                }
+            }
             obj.instance.exports.main();
         }
     );

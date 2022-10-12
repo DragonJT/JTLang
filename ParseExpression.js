@@ -72,7 +72,6 @@ function ParseExpression(tokens){
             case '<': return TermType.Operator;
             case '>': return TermType.Operator;
             default: 
-                console.log(tokens);
                 throw "Type defaulted:"+type;
         }
     }

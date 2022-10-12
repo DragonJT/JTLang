@@ -131,21 +131,26 @@ function Parser(reader){
         }
     }
 
-    function ParseFunction(){
+    function ParseFunction(_export){
         var returnType = Expect(TokenType.Identifier);
         var name = Expect(TokenType.Identifier);
         var args = ParseArgs();
         var body = ParseBody();
-        return new ASTFunction(name, args, returnType, body);
+        return new ASTFunction(_export, name, args, returnType, body);
     }
 
     function ParseImportFunction(){
-        reader.Scan();
+        Expect('import');
         var returnType = Expect(TokenType.Identifier);
         var name = Expect(TokenType.Identifier);
         var args = ParseArgs();
         var body = Expect(TokenType.Javascript);
         return new ASTImportFunction(name, args, returnType, body);
+    }
+
+    function ParseExportFunction(){
+        Expect('export');
+        return ParseFunction(true);
     }
 
     function ParseAST(){
@@ -154,8 +159,9 @@ function Parser(reader){
             if(reader.current == undefined)
                 return new AST(body);
             switch(reader.current.type){
-                case TokenType.Identifier: body.push(ParseFunction()); break;
+                case TokenType.Identifier: body.push(ParseFunction(false)); break;
                 case 'import': body.push(ParseImportFunction()); break;
+                case 'export': body.push(ParseExportFunction()); break;
                 default: Error(TokenType.Identifier);
             }
         }
