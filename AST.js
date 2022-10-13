@@ -29,7 +29,7 @@ class ASTIdentifier{
         else{
             if(this.globalID == undefined)
                 throw "Expecting localID or globalID"
-            wasm.push(Opcode.i32_const, ...signedLEB128(0));
+            wasm.push(Opcode.i32_const, ...signedLEB128(this.globalID));
             wasm.push(Opcode.f32_load);
             //align and offset???
             wasm.push(...[0x00, 0x00]);

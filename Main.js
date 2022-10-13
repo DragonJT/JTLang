@@ -33,6 +33,7 @@ import void CallNextUpdateFunc() #{
 }#
 
 var y = 0;
+var y2 = 0;
 
 export void Update(){
     DrawRect(0,0,800,600,0,0,0);
@@ -46,13 +47,19 @@ export void Update(){
         DrawCircle(100+x*50,10+y,50,x/10,1,0);
     }
     for(x=0;x<10;x++){
-        DrawCircle(100+x*50,40+y,50,0,x/10,1);
+        DrawCircle(100+x*50,40+y2,50,0,x/10,1);
     }
     DrawFloat(100,100,y);
+    DrawFloat(100,200,y2);
+
     CallNextUpdateFunc();
     y++;
+    y2=y2+1.5;
+
     if(y>600)
         y=0;
+    if(y2>600)
+        y2=0;
 }
 
 export void main(){
