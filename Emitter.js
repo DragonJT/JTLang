@@ -24,7 +24,9 @@ const Opcode = {
     f32_mul: 0x94,
     f32_div: 0x95,
     f32_neg: 0x8c,
-    i32_trunc_f32_s: 0xa8
+    i32_trunc_f32_s: 0xa8,
+    f32_load: 0x2a,
+    f32_store: 0x38,
 };
 
 // https://webassembly.github.io/spec/core/binary/types.html
@@ -89,6 +91,7 @@ function EmitAndRun(ast, output){
     var functions = ast.body.filter(b=>b.constructor.name == 'ASTFunction');
     var importFunctions = ast.body.filter(b=>b.constructor.name == 'ASTImportFunction');
     ast.CalcCalls();
+    ast.CalcVariables();
     //=============================
 
     const flatten = (arr) => [].concat.apply([], arr);
@@ -170,13 +173,23 @@ function EmitAndRun(ast, output){
         ]);
     }
 
+    const memoryImport = [
+        ...encodeString("env"),
+        ...encodeString("memory"),
+        ExportType.mem,
+        /* limits https://webassembly.github.io/spec/core/binary/types.html#limits -
+          indicates a min memory size of one page */
+        0x00,
+        unsignedLEB128(10),
+      ];
+
     function EmitImportFunctions(importFunctions){
-        return encodeVector(importFunctions.map((f,i)=>[
+        return importFunctions.map((f,i)=>[
             ...encodeString("env"),
             ...encodeString(f.name),
             ExportType.func,
             ...unsignedLEB128(i)
-        ]));
+        ]);
     }
 
     function EmitFuncs(functions){
@@ -185,7 +198,7 @@ function EmitAndRun(ast, output){
 
     const typeSection = createSection(Section.type, encodeVector([...EmitTypes(importFunctions), ...EmitTypes(functions)]));
 
-    const importSection = createSection(Section.import, EmitImportFunctions(importFunctions));
+    const importSection = createSection(Section.import, encodeVector([...EmitImportFunctions(importFunctions), memoryImport]));
 
     const funcSection = createSection(Section.func, EmitFuncs(functions));
 
@@ -225,10 +238,9 @@ function EmitAndRun(ast, output){
     }
 
     function EmitFunction(f){
-        const localCount = f.CalcLocals();
         var wasm = [];
         f.body.Emit(wasm);
-        const locals = localCount > 0 ? [encodeLocal(localCount, Valtype.f32)] : [];
+        const locals = f.localCount > 0 ? [encodeLocal(f.localCount, Valtype.f32)] : [];
         return encodeVector([...encodeVector(locals), ...wasm, Opcode.end])
     }
 
@@ -244,7 +256,9 @@ function EmitAndRun(ast, output){
         ...codeSection
     ]);
 
-    WebAssembly.instantiate(wasm, ImportObject()).then(
+    var importObject = ImportObject();
+    importObject.env.memory = new WebAssembly.Memory({ initial: 10, maximum: 10 });
+    WebAssembly.instantiate(wasm, importObject).then(
         (obj) => {
             for(var f of functions){
                 if(f._export){

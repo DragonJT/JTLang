@@ -1,3 +1,4 @@
+
 class ASTComma{
     constructor(a,b){
         this.a = a;
@@ -22,7 +23,17 @@ class ASTIdentifier{
     }
 
     Emit(wasm){
-        wasm.push(Opcode.get_local, ...unsignedLEB128(this.localID));
+        if(this.localID!=undefined){
+            wasm.push(Opcode.get_local, ...unsignedLEB128(this.localID));
+        }
+        else{
+            if(this.globalID == undefined)
+                throw "Expecting localID or globalID"
+            wasm.push(Opcode.i32_const, ...signedLEB128(0));
+            wasm.push(Opcode.f32_load);
+            //align and offset???
+            wasm.push(...[0x00, 0x00]);
+        }
     }
 
     Traverse(nodes){
@@ -104,19 +115,45 @@ class ASTBody{
     }
 }
 
-class ASTSetLocal{
-    constructor(local, expression){
-        this.local = local;
+class ASTVar{
+    constructor(name, expression){
+        this.name = name;
         this.expression = expression;
     }
 
     Emit(wasm){
         this.expression.Emit(wasm);
-        wasm.push(Opcode.set_local, ...unsignedLEB128(this.local.localID));
+        wasm.push(Opcode.set_local, ...unsignedLEB128(this.localID));
     }
 
     Traverse(nodes){
-        this.local.Traverse(nodes);
+        this.expression.Traverse(nodes);
+        nodes.push(this);
+    }
+}
+
+class ASTSetVariable{
+    constructor(variable, expression){
+        this.variable = variable;
+        this.expression = expression;
+    }
+
+    Emit(wasm){
+        if(this.variable.localID!=undefined){
+            this.expression.Emit(wasm);
+            wasm.push(Opcode.set_local, ...unsignedLEB128(this.variable.localID));
+        }
+        else{
+            wasm.push(Opcode.i32_const, ...signedLEB128(this.variable.globalID));
+            this.expression.Emit(wasm);
+            wasm.push(Opcode.f32_store);
+            //align and offset???
+            wasm.push(...[0x00, 0x00]);
+        }
+    }
+
+    Traverse(nodes){
+        this.variable.Traverse(nodes);
         this.expression.Traverse(nodes);
         nodes.push(this);
     }
@@ -128,6 +165,31 @@ class ASTUnaryOp{
         this.op = op;
     }
 
+    IncrementOrDecrement(wasm, opcode){
+        var localID = this.expression.localID;
+        if(localID !=undefined){
+            wasm.push(Opcode.get_local, ...unsignedLEB128(localID));
+            wasm.push(Opcode.f32_const, ...ieee754(1));
+            wasm.push(opcode);
+            wasm.push(Opcode.set_local, ...unsignedLEB128(localID));
+        }
+        else{
+            var globalID = this.expression.globalID;
+            if(globalID == undefined)
+                throw "local and global ids are undefined";
+            wasm.push(Opcode.i32_const, ...signedLEB128(globalID));
+            wasm.push(Opcode.i32_const, ...signedLEB128(globalID));
+            wasm.push(Opcode.f32_load);
+            //align and offset???
+            wasm.push(...[0x00, 0x00]);
+            wasm.push(Opcode.f32_const, ...ieee754(1));
+            wasm.push(opcode);
+            wasm.push(Opcode.f32_store);
+            //align and offset???
+            wasm.push(...[0x00, 0x00]);
+        }
+    }
+
     Emit(wasm){
         switch(this.op){
             case 'p': break;
@@ -136,22 +198,10 @@ class ASTUnaryOp{
                 wasm.push(Opcode.f32_neg);
                 break;
             case '++':
-                var localID = this.expression.localID;
-                if(localID == undefined)
-                    throw "Expecting localID for ++";
-                wasm.push(Opcode.get_local, ...unsignedLEB128(localID));
-                wasm.push(Opcode.f32_const, ...ieee754(1));
-                wasm.push(Opcode.f32_add);
-                wasm.push(Opcode.set_local, ...unsignedLEB128(localID));
+                this.IncrementOrDecrement(wasm, Opcode.f32_add);
                 break;
             case '--':
-                var localID = this.expression.localID;
-                if(localID == undefined)
-                    throw "Expecting localID for --";
-                wasm.push(Opcode.get_local, ...unsignedLEB128(localID));
-                wasm.push(Opcode.f32_const, ...ieee754(1));
-                wasm.push(Opcode.f32_sub);
-                wasm.push(Opcode.set_local, ...unsignedLEB128(localID));
+                this.IncrementOrDecrement(wasm, Opcode.f32_sub);
                 break;
             default: throw "UnaryOp defaulted: "+this.op;
         }
@@ -316,22 +366,29 @@ class ASTFunction{
         nodes.push(this);
     }
 
-    CalcLocals(){
-        var vars = new Map();
+    CalcVariables(globals){
+        var locals = new Map();
         for(var i=0;i<this.args.length;i++){
-            vars.set(this.args[i].name, i);
+            locals.set(this.args[i].name, i);
         }
 
         for(var n of Traverse(this)){
-            if(n.constructor.name == 'ASTIdentifier'){
-                n.localID = vars.get(n.name);
-                if(n.localID==undefined){
-                    n.localID = vars.size;
-                    vars.set(n.name, vars.size);
+            if(n.constructor.name == 'ASTVar'){
+                if(locals.has(n.name))
+                    throw "Local already found:"+n.name;
+                n.localID = locals.size;
+                locals.set(n.name, n.localID);
+            }
+            else if(n.constructor.name == 'ASTIdentifier'){
+                n.localID = locals.get(n.name);
+                if(n.localID == undefined){
+                    n.globalID = globals.get(n.name);
+                    if(n.globalID == undefined)
+                        throw "Variable has not declaration: "+n.name;
                 }
             }
         }
-        return vars.size;
+        this.localCount = locals.size;
     }
 }
 
@@ -361,6 +418,20 @@ class AST{
                     throw "Calling Unknown function: "+n.name;
                 n.funcID = f.funcID;
             }
+        }
+    }
+
+    CalcVariables(){
+        var vars = this.body.filter(b=>b.constructor.name == 'ASTVar');
+        var globals = new Map();
+        for(var v of vars){
+            if(globals.has(v.name))
+                throw "Globals already contains var: "+v.name;
+            globals.set(v.name, globals.size*4);
+        }
+        var functions = this.body.filter(b=>b.constructor.name == 'ASTFunction');
+        for(var f of functions){
+            f.CalcVariables(globals);
         }
     }
 

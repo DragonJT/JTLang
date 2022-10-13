@@ -174,10 +174,10 @@ function ParseExpression(tokens){
         stack.push(new ASTUnaryOp(stack.pop(), op));
     }
 
-    function CreateSetLocal(){
+    function CreateSetVariable(){
         var expression = stack.pop();
-        var local = stack.pop();
-        stack.push(new ASTSetLocal(local, expression));
+        var variable = stack.pop();
+        stack.push(new ASTSetVariable(variable, expression));
     }
 
     function CreateCall(name){
@@ -197,7 +197,7 @@ function ParseExpression(tokens){
             case TokenType.Identifier: stack.push(new ASTIdentifier(t.value)); break;
             case TokenType.Int: stack.push(new ASTI32Const(t.value)); break;
             case TokenType.Float: stack.push(new ASTF32Const(t.value)); break;
-            case '=': CreateSetLocal(); break;
+            case '=': CreateSetVariable(); break;
             case '*': CreateBinaryOp('*'); break;
             case '/': CreateBinaryOp('/'); break;
             case '+': CreateBinaryOp('+'); break;

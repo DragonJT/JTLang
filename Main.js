@@ -5,7 +5,6 @@ import void Init() #{
     canvas.width = 800;
     canvas.height = 600;
     global.ctx = canvas.getContext('2d');
-    global.frame=0;
 }#
 
 import void DrawRect(f32 x, f32 y, f32 w, f32 h, f32 r, f32 g, f32 b) #{
@@ -24,32 +23,36 @@ import void DrawCircle(f32 x, f32 y, f32 radius, f32 r, f32 g, f32 b) #{
 
 import void DrawFloat(f32 x, f32 y, f32 value) #{
     var ctx = global.ctx;
-    ctx.fillStyle = 'black';
+    ctx.fillStyle = 'white';
     ctx.font = '30px Arial';
     ctx.fillText(value, x, y);
 }#
 
 import void CallNextUpdateFunc() #{
-    global.frame++;
-    requestAnimationFrame(()=>exports.Update(global.frame));
+    requestAnimationFrame(exports.Update);
 }#
 
-export void Update(f32 frame){
+var y = 0;
+
+export void Update(){
     DrawRect(0,0,800,600,0,0,0);
     DrawCircle(100,100,50,1,0,0);
     DrawCircle(150,175,50,0,1,0);
     DrawCircle(200,175,25,0,0,1);
     DrawCircle(250,100,75,1,1,0);
 
+    var x = 0;
     for(x=0;x<10;x++){
-        DrawCircle(100+x*50,10+frame,50,x/10,1,0);
+        DrawCircle(100+x*50,10+y,50,x/10,1,0);
     }
     for(x=0;x<10;x++){
-        DrawCircle(100+x*50,40+frame,50,0,x/10,1);
+        DrawCircle(100+x*50,40+y,50,0,x/10,1);
     }
-    y=3+-4*5;
     DrawFloat(100,100,y);
     CallNextUpdateFunc();
+    y++;
+    if(y>600)
+        y=0;
 }
 
 export void main(){
