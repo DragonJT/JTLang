@@ -115,6 +115,26 @@ class ASTBody{
     }
 }
 
+class ASTGlobalVar{
+    constructor(name, expression){
+        this.name = name;
+        this.expression = expression;
+    }
+
+    Emit(wasm){
+        wasm.push(Opcode.i32_const, ...signedLEB128(this.globalID));
+        this.expression.Emit(wasm);
+        wasm.push(Opcode.f32_store);
+        //align and offset???
+        wasm.push(...[0x00, 0x00]);
+    }
+
+    Traverse(nodes){
+        this.expression.Traverse(nodes);
+        nodes.push(this);
+    }
+}
+
 class ASTVar{
     constructor(name, expression){
         this.name = name;
@@ -422,13 +442,18 @@ class AST{
     }
 
     CalcVariables(){
-        var vars = this.body.filter(b=>b.constructor.name == 'ASTVar');
         var globals = new Map();
-        for(var v of vars){
-            if(globals.has(v.name))
-                throw "Globals already contains var: "+v.name;
-            globals.set(v.name, globals.size*4);
+
+        for(var n of Traverse(this)){
+            if(n.constructor.name == 'ASTGlobalVar'){
+                if(globals.has(n.name))
+                    throw "Globals already contains var: "+v.name;
+                var globalID = globals.size*4;
+                globals.set(n.name, globalID);
+                n.globalID = globalID;
+            }
         }
+
         var functions = this.body.filter(b=>b.constructor.name == 'ASTFunction');
         for(var f of functions){
             f.CalcVariables(globals);

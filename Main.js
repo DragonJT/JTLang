@@ -32,9 +32,6 @@ import void CallNextUpdateFunc() #{
     requestAnimationFrame(exports.Update);
 }#
 
-var y = 0;
-var y2 = 0;
-
 export void Update(){
     DrawRect(0,0,800,600,0,0,0);
     DrawCircle(100,100,50,1,0,0);
@@ -63,6 +60,8 @@ export void Update(){
 }
 
 export void main(){
+    global_var y = 0;
+    global_var y2 = 300;
     Init();
     CallNextUpdateFunc();
 }

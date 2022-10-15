@@ -114,9 +114,18 @@ function Parser(reader){
         return new ASTVar(name, expression);
     }
 
+    function ParseGlobalVar(){
+        Expect('global_var');
+        var name = Expect('Identifier');
+        Expect('=');
+        var expression = ParseExpression(ParseExpressionTokens(';'));
+        return new ASTGlobalVar(name, expression);
+    }
+
     function ParseStatement(){
         NotExpectingEndOfInput('statement');
         switch(reader.current.type){
+            case 'global_var': return ParseGlobalVar();
             case 'var': return ParseVar();
             case '{': return ParseBody();
             case 'if': return ParseIf();
@@ -168,7 +177,6 @@ function Parser(reader){
             if(reader.current == undefined)
                 return new AST(body);
             switch(reader.current.type){
-                case 'var': body.push(ParseVar()); break;
                 case TokenType.Identifier: body.push(ParseFunction(false)); break;
                 case 'import': body.push(ParseImportFunction()); break;
                 case 'export': body.push(ParseExportFunction()); break;
