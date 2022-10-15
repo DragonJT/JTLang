@@ -180,23 +180,25 @@ function ParseExpression(tokens){
         stack.push(new ASTSetVariable(variable, expression));
     }
 
-    function CreateCall(name){
-        stack.push(new ASTCall(name, stack.pop()));
+    function CreateCall(name, args){        
+        stack.push(new ASTCall(name, args));
     }
 
-    function CreateComma(){
-        var b = stack.pop();
-        var a = stack.pop();
-        stack.push(new ASTComma(a,b));
-    }
-
+    var commas = 0;
     for(var t of output){
         switch(t.type){
-            case TokenType.Call: CreateCall(t.value); break;
-            case TokenType.EmptyCall: stack.push(new ASTEmptyCall(t.value)); break;
+            case TokenType.Call: 
+                var args = [];
+                for(var i=0;i<commas+1;i++){
+                    args.push(stack.pop());
+                }
+                CreateCall(t.value, args.reverse());
+                commas=0;
+                break;
+            case TokenType.EmptyCall: CreateCall(t.value, []); break;
             case TokenType.Identifier: stack.push(new ASTIdentifier(t.value)); break;
-            case TokenType.Int: stack.push(new ASTI32Const(t.value)); break;
-            case TokenType.Float: stack.push(new ASTF32Const(t.value)); break;
+            case TokenType.Int: stack.push(new ASTConst(t.value, 'i32')); break;
+            case TokenType.Float: stack.push(new ASTConst(t.value, 'f32')); break;
             case '=': CreateSetVariable(); break;
             case '*': CreateBinaryOp('*'); break;
             case '/': CreateBinaryOp('/'); break;
@@ -208,7 +210,7 @@ function ParseExpression(tokens){
             case '--': CreateUnaryOp('--'); break;
             case '<': CreateBinaryOp('<'); break;
             case '>': CreateBinaryOp('>'); break;
-            case ',': CreateComma(); break;
+            case ',': commas++; break;
             default: throw "opcodes defaulted:"+t.type;
         }
     }

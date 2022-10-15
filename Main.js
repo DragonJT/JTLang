@@ -25,7 +25,14 @@ import void DrawFloat(f32 x, f32 y, f32 value) #{
     var ctx = global.ctx;
     ctx.fillStyle = 'white';
     ctx.font = '30px Arial';
-    ctx.fillText(value, x, y);
+    ctx.fillText("Float:"+value, x, y);
+}#
+
+import void DrawInt(f32 x, f32 y, i32 value) #{
+    var ctx = global.ctx;
+    ctx.fillStyle = 'white';
+    ctx.font = '30px Arial';
+    ctx.fillText("Int:"+value, x, y);
 }#
 
 import void CallNextUpdateFunc() #{
@@ -39,7 +46,7 @@ export void Update(){
     DrawCircle(200,175,25,0,0,1);
     DrawCircle(250,100,75,1,1,0);
 
-    var x = 0;
+    var x = 0.;
     for(x=0;x<10;x++){
         DrawCircle(100+x*50,10+y,50,x/10,1,0);
     }
@@ -60,8 +67,8 @@ export void Update(){
 }
 
 export void main(){
-    global_var y = 0;
-    global_var y2 = 300;
+    global_var y = 0.;
+    global_var y2 = 300.;
     Init();
     CallNextUpdateFunc();
 }

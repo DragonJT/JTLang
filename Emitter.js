@@ -1,6 +1,7 @@
 //copied quite a lot from https://github.com/ColinEberhardt/chasm
 
 // https://webassembly.github.io/spec/core/binary/instructions.html
+// https://pengowray.github.io/wasm-ops/
 const Opcode = {
     block: 0x02,
     loop: 0x03,
@@ -25,8 +26,16 @@ const Opcode = {
     f32_div: 0x95,
     f32_neg: 0x8c,
     i32_trunc_f32_s: 0xa8,
+    i32_load: 0x28,
     f32_load: 0x2a,
     f32_store: 0x38,
+    i32_mul: 0x6c,
+    i32_div: 0x6d,
+    i32_add: 0x6a,
+    i32_sub: 0x6b,
+    i32_lt: 0x48,
+    i32_gt: 0x4a,
+    f32_convert_i32_s: 0xb2,
 };
 
 // https://webassembly.github.io/spec/core/binary/types.html
@@ -202,11 +211,6 @@ function EmitAndRun(ast, output){
 
     const funcSection = createSection(Section.func, EmitFuncs(functions));
 
-    for(var f of functions){
-        if(f._export){
-            console.log(f);
-        }
-    }
     const exportSection = createSection(
         Section.export,
         encodeVector(functions.filter((f)=>f._export).map(f=>[...encodeString(f.name), ExportType.func, ...unsignedLEB128(f.funcID)])),
@@ -240,7 +244,13 @@ function EmitAndRun(ast, output){
     function EmitFunction(f){
         var wasm = [];
         f.body.Emit(wasm);
-        const locals = f.localCount > 0 ? [encodeLocal(f.localCount, Valtype.f32)] : [];
+        var locals = [];
+        if(f.f32LocalCount>0){
+            locals.push(encodeLocal(f.f32LocalCount, Valtype.f32));
+        }
+        if(f.i32LocalCount>0){
+            locals.push(encodeLocal(f.i32LocalCount, Valtype.i32));
+        }
         return encodeVector([...encodeVector(locals), ...wasm, Opcode.end])
     }
 

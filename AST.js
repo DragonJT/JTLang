@@ -23,14 +23,18 @@ class ASTIdentifier{
     }
 
     Emit(wasm){
-        if(this.localID!=undefined){
-            wasm.push(Opcode.get_local, ...unsignedLEB128(this.localID));
+        if(this.local!=undefined){
+            wasm.push(Opcode.get_local, ...unsignedLEB128(this.local.id));
         }
         else{
-            if(this.globalID == undefined)
-                throw "Expecting localID or globalID"
-            wasm.push(Opcode.i32_const, ...signedLEB128(this.globalID));
-            wasm.push(Opcode.f32_load);
+            if(this.global == undefined)
+                throw "Expecting local or global"
+            wasm.push(Opcode.i32_const, ...unsignedLEB128(this.global.id));
+            switch(this.global.type){
+                case 'i32': wasm.push(Opcode.i32_load); break;
+                case 'f32': wasm.push(Opcode.f32_load); break;
+                default: throw "ASTIdentifier defaulted:"+this.global.type;
+            }
             //align and offset???
             wasm.push(...[0x00, 0x00]);
         }
@@ -39,33 +43,63 @@ class ASTIdentifier{
     Traverse(nodes){
         nodes.push(this);
     }
+
+    GetType(){
+        if(this.local!=undefined)
+            return this.local.type;
+        else if(this.global!=undefined)
+            return this.global.type;
+        else
+            throw "Expecting local or global";
+    }
 }
 
-class ASTF32Const{
-    constructor(value){
+class ASTConst{
+    constructor(value, type){
         this.value = value;
+        this.type = type;
     }
 
     Emit(wasm){
-        wasm.push(Opcode.f32_const, ...ieee754(this.value));
+        switch(this.type){
+            case 'i32': wasm.push(Opcode.i32_const, ...signedLEB128(this.value)); break;
+            case 'f32': wasm.push(Opcode.f32_const, ...ieee754(this.value)); break;
+            default: throw 'ASTConst defaulted:'+this.type;
+        }
     }
 
     Traverse(nodes){
         nodes.push(this);
     }
+
+    GetType(){
+        return this.type;
+    }
 }
 
-class ASTI32Const{
-    constructor(value){
-        this.value = value;
+class ASTImplicitConvert{
+    constructor(from, to, expression){
+        this.from = from;
+        this.to = to;
+        this.expression = expression;
     }
 
     Emit(wasm){
-        wasm.push(Opcode.f32_const, ...ieee754(this.value));
+        this.expression.Emit(wasm);
+        var conversion = this.from+'->'+this.to;
+        switch(conversion){
+            case 'i32->f32': wasm.push(Opcode.f32_convert_i32_s); break;
+            default: throw 'No implicit conversion: '+conversion;
+        }
     }
 
     Traverse(nodes){
+        this.expression.Traverse(nodes);
         nodes.push(this);
+    }
+
+    GetType(){
+        return this.to;
     }
 }
 
@@ -77,23 +111,74 @@ class ASTBinaryOP{
     }
 
     Emit(wasm){
+        var opType = this.GetOpType();
         this.a.Emit(wasm);
         this.b.Emit(wasm);
-        switch(this.op){
-            case '*': wasm.push(Opcode.f32_mul); break;
-            case '/': wasm.push(Opcode.f32_div); break;
-            case '+': wasm.push(Opcode.f32_add); break;
-            case '-': wasm.push(Opcode.f32_sub); break;
-            case '<': wasm.push(Opcode.f32_lt); break;
-            case '>': wasm.push(Opcode.f32_gt); break;
-            default: throw "BinaryOp defaulted: "+this.op;
+        switch(opType){
+            case 'f32':{
+                switch(this.op){
+                    case '*': wasm.push(Opcode.f32_mul); break;
+                    case '/': wasm.push(Opcode.f32_div); break;
+                    case '+': wasm.push(Opcode.f32_add); break;
+                    case '-': wasm.push(Opcode.f32_sub); break;
+                    case '<': wasm.push(Opcode.f32_lt); break;
+                    case '>': wasm.push(Opcode.f32_gt); break;
+                    default: throw "BinaryOp f32 Emit defaulted: "+this.op;
+                }
+                break;
+            }
+            case 'i32':{
+                switch(this.op){
+                    case '*': wasm.push(Opcode.i32_mul); break;
+                    case '/': wasm.push(Opcode.i32_div); break;
+                    case '+': wasm.push(Opcode.i32_add); break;
+                    case '-': wasm.push(Opcode.i32_sub); break;
+                    case '<': wasm.push(Opcode.i32_lt); break;
+                    case '>': wasm.push(Opcode.i32_gt); break;
+                    default: throw "BinaryOp i32 Emit defaulted: "+this.op;
+                }
+                break;
+            }
         }
+        
     }
 
     Traverse(nodes){
         this.a.Traverse(nodes);
         this.b.Traverse(nodes);
         nodes.push(this);
+    }
+
+    GetOpType(){
+        var inTypeA = this.a.GetType();
+        var inTypeB = this.b.GetType();
+        if(inTypeA != inTypeB){
+            if(inTypeA == 'f32' && inTypeB == 'i32'){
+                this.b = new ASTImplicitConvert('i32', 'f32', this.b);
+                return 'f32';
+            }
+            else if(inTypeA == 'i32' && inTypeB == 'f32'){
+                this.a = new ASTImplicitConvert('i32', 'f32', this.a);
+                return 'f32';
+            }
+            else{
+                throw 'Cannot implicitly convert: '+inTypeA+'->'+inTypeB;
+            }
+        }
+        return inTypeA;
+    }
+
+    GetType(){
+        var opType = this.GetOpType();
+        switch(this.op){
+            case '*': return opType;
+            case '/': return opType;
+            case '+': return opType;
+            case '-': return opType;
+            case '<': return 'i32';
+            case '>': return 'i32';
+            default: throw "BinaryOp GetType defaulted: "+this.op;
+        }
     }
 }
 
@@ -129,6 +214,10 @@ class ASTGlobalVar{
         wasm.push(...[0x00, 0x00]);
     }
 
+    GetType(){
+        return this.expression.GetType();
+    }
+
     Traverse(nodes){
         this.expression.Traverse(nodes);
         nodes.push(this);
@@ -143,7 +232,11 @@ class ASTVar{
 
     Emit(wasm){
         this.expression.Emit(wasm);
-        wasm.push(Opcode.set_local, ...unsignedLEB128(this.localID));
+        wasm.push(Opcode.set_local, ...unsignedLEB128(this.local.id));
+    }
+
+    GetType(){
+        return this.expression.GetType();
     }
 
     Traverse(nodes){
@@ -159,14 +252,30 @@ class ASTSetVariable{
     }
 
     Emit(wasm){
-        if(this.variable.localID!=undefined){
+        if(this.variable.local!=undefined){
+            var from = this.expression.GetType();
+            var to = this.variable.local.type;
+            if(from!=to){
+                this.expression = new ASTImplicitConvert(from, to, this.expression);
+            }
             this.expression.Emit(wasm);
-            wasm.push(Opcode.set_local, ...unsignedLEB128(this.variable.localID));
+            wasm.push(Opcode.set_local, ...unsignedLEB128(this.variable.local.id));
         }
         else{
-            wasm.push(Opcode.i32_const, ...signedLEB128(this.variable.globalID));
+            if(this.variable.global==undefined){
+                throw "SetVariable is not local or global";
+            }
+            var from = this.expression.GetType();
+            var to = this.variable.global.type;
+            if(from!=to){
+                this.expression = new ASTImplicitConvert(from, to, this.expression);
+            }
+            wasm.push(Opcode.i32_const, ...signedLEB128(this.variable.global.id));
             this.expression.Emit(wasm);
-            wasm.push(Opcode.f32_store);
+            switch(to){
+                case 'i32': wasm.push(Opcode.i32_store); break;
+                case 'f32': wasm.push(Opcode.f32_store); break;
+            }
             //align and offset???
             wasm.push(...[0x00, 0x00]);
         }
@@ -185,45 +294,72 @@ class ASTUnaryOp{
         this.op = op;
     }
 
-    IncrementOrDecrement(wasm, opcode){
-        var localID = this.expression.localID;
-        if(localID !=undefined){
-            wasm.push(Opcode.get_local, ...unsignedLEB128(localID));
-            wasm.push(Opcode.f32_const, ...ieee754(1));
+    Assign(wasm, opcode, constCode, valueBytes, loadCode, storeCode){
+        var local = this.expression.local;
+        if(local !=undefined){
+            wasm.push(Opcode.get_local, ...unsignedLEB128(local.id));
+            wasm.push(constCode, ...valueBytes);
             wasm.push(opcode);
-            wasm.push(Opcode.set_local, ...unsignedLEB128(localID));
+            wasm.push(Opcode.set_local, ...unsignedLEB128(local.id));
         }
         else{
-            var globalID = this.expression.globalID;
-            if(globalID == undefined)
+            var global = this.expression.global;
+            if(global == undefined)
                 throw "local and global ids are undefined";
-            wasm.push(Opcode.i32_const, ...signedLEB128(globalID));
-            wasm.push(Opcode.i32_const, ...signedLEB128(globalID));
-            wasm.push(Opcode.f32_load);
+            wasm.push(Opcode.i32_const, ...signedLEB128(global.id));
+            wasm.push(Opcode.i32_const, ...signedLEB128(global.id));
+            wasm.push(loadCode);
             //align and offset???
             wasm.push(...[0x00, 0x00]);
-            wasm.push(Opcode.f32_const, ...ieee754(1));
+            wasm.push(constCode, ...valueBytes);
             wasm.push(opcode);
-            wasm.push(Opcode.f32_store);
+            wasm.push(storeCode);
             //align and offset???
             wasm.push(...[0x00, 0x00]);
         }
     }
 
+    GetType(){
+        return this.expression.GetType();
+    }
+
     Emit(wasm){
-        switch(this.op){
-            case 'p': break;
-            case 'm': 
-                this.expression.Emit(wasm);
-                wasm.push(Opcode.f32_neg);
+        switch(this.GetType()){
+            case 'i32':{
+                switch(this.op){
+                    case 'p': break;
+                    case 'm': 
+                        wasm.push(i32_const, ...signedLEB128(0));
+                        this.expression.Emit(wasm);
+                        wasm.push(Opcode.i32_sub);
+                        break;
+                    case '++':
+                        this.Assign(wasm, Opcode.i32_add, Opcode.i32_const, signedLEB128(1), Opcode.i32_load, Opcode.i32_store);
+                        break;
+                    case '--':
+                        this.Assign(wasm, Opcode.i32_sub, Opcode.i32_const, signedLEB128(1), Opcode.i32_load, Opcode.i32_store);
+                        break;
+                    default: throw "UnaryOp defaulted: "+this.op;
+                }
                 break;
-            case '++':
-                this.IncrementOrDecrement(wasm, Opcode.f32_add);
+            }
+            case 'f32':{
+                switch(this.op){
+                    case 'p': break;
+                    case 'm': 
+                        this.expression.Emit(wasm);
+                        wasm.push(Opcode.f32_neg);
+                        break;
+                    case '++':
+                        this.Assign(wasm, Opcode.f32_add, Opcode.f32_const, ieee754(1), Opcode.f32_load, Opcode.f32_store);
+                        break;
+                    case '--':
+                        this.Assign(wasm, Opcode.f32_sub, Opcode.f32_const, ieee754(1), Opcode.f32_load, Opcode.f32_store);
+                        break;
+                    default: throw "UnaryOp defaulted: "+this.op;
+                }
                 break;
-            case '--':
-                this.IncrementOrDecrement(wasm, Opcode.f32_sub);
-                break;
-            default: throw "UnaryOp defaulted: "+this.op;
+            }
         }
     }
 
@@ -322,32 +458,33 @@ class ASTFor{
 }
 
 class ASTCall{
-    constructor(name, argExpression){
+    constructor(name, args){
         this.name = name;
-        this.argExpression = argExpression;
+        this.args = args;
     }
 
     Emit(wasm){
-        this.argExpression.Emit(wasm);
-        wasm.push(Opcode.call, ...unsignedLEB128(this.funcID));
+        if(this.args.length != this.func.args.length)
+            throw "wrong number of arguments: "+this.name;
+        for(var i=0;i<this.args.length;i++){
+            var from = this.args[i].GetType();
+            var to = this.func.args[i].type;
+            if(from != to){
+                this.args[i] = new ASTImplicitConvert(from, to, this.args[i]);
+            }
+        }
+        for(var a of this.args)
+            a.Emit(wasm);
+        wasm.push(Opcode.call, ...unsignedLEB128(this.func.funcID));
+    }
+
+    GetType(){
+        return this.func.returnType;
     }
 
     Traverse(nodes){
-        this.argExpression.Traverse(nodes);
-        nodes.push(this);
-    }
-}
-
-class ASTEmptyCall{
-    constructor(name){
-        this.name = name;
-    }
-
-    Emit(wasm){
-        wasm.push(Opcode.call, ...unsignedLEB128(this.funcID));
-    }
-
-    Traverse(nodes){
+        for(var a of this.args)
+            a.Traverse(nodes);
         nodes.push(this);
     }
 }
@@ -369,6 +506,13 @@ class ASTImportFunction{
 
     Traverse(nodes){
         nodes.push(this);
+    }
+}
+
+class Variable{
+    constructor(id, type){
+        this.id = id;
+        this.type = type;
     }
 }
 
@@ -396,19 +540,35 @@ class ASTFunction{
             if(n.constructor.name == 'ASTVar'){
                 if(locals.has(n.name))
                     throw "Local already found:"+n.name;
-                n.localID = locals.size;
-                locals.set(n.name, n.localID);
+                n.local = new Variable(-1, n.GetType());
+                locals.set(n.name, n.local);
             }
             else if(n.constructor.name == 'ASTIdentifier'){
-                n.localID = locals.get(n.name);
-                if(n.localID == undefined){
-                    n.globalID = globals.get(n.name);
-                    if(n.globalID == undefined)
-                        throw "Variable has not declaration: "+n.name;
+                n.local = locals.get(n.name);
+                if(n.local == undefined){
+                    n.global = globals.get(n.name);
+                    if(n.global == undefined)
+                        throw "Variable has no declaration: "+n.name;
                 }
             }
         }
-        this.localCount = locals.size;
+        var id = this.args.length;
+        this.f32LocalCount = 0;
+        for(var l of locals.values()){
+            if(l.type == 'f32'){
+                l.id = id;
+                id++;
+                this.f32LocalCount++;
+            }
+        }
+        this.i32LocalCount = 0;
+        for(var l of locals.values()){
+            if(l.type == 'i32'){
+                l.id = id;
+                id++;
+                this.i32LocalCount++;
+            }
+        }
     }
 }
 
@@ -433,10 +593,9 @@ class AST{
 
         for(var n of Traverse(this)){
             if(n.constructor.name == 'ASTCall' || n.constructor.name == 'ASTEmptyCall'){
-                var f = funcs.get(n.name);
-                if(f == undefined)
+                n.func = funcs.get(n.name);
+                if(n.func == undefined)
                     throw "Calling Unknown function: "+n.name;
-                n.funcID = f.funcID;
             }
         }
     }
@@ -448,9 +607,8 @@ class AST{
             if(n.constructor.name == 'ASTGlobalVar'){
                 if(globals.has(n.name))
                     throw "Globals already contains var: "+v.name;
-                var globalID = globals.size*4;
-                globals.set(n.name, globalID);
-                n.globalID = globalID;
+                n.global = new Variable(globals.size*4, n.GetType());
+                globals.set(n.name, n.global);
             }
         }
 
