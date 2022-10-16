@@ -5,7 +5,7 @@ import void Init() #{
     canvas.width = 800;
     canvas.height = 600;
     global.ctx = canvas.getContext('2d');
-    console.log(exports.MoveHorizontal);
+
     addEventListener('keydown', e=>{
         if(e.key == 'ArrowLeft')
             exports.KeyLeft(2);
