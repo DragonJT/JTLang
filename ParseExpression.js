@@ -27,10 +27,10 @@ function ParseFunctionCalls(tokens){
     }
 }
 
-function ParseArrayIdentifiers(tokens){
+function ParseIndexIdentifiers(tokens){
     for(var i=0;i<tokens.length-1;i++){
         if(tokens[i].type == TokenType.Identifier && tokens[i+1].type == '['){
-            tokens[i].type = TokenType.ArrayIdentifier;
+            tokens[i].type = TokenType.IndexIdentifier;
         }
     }
 }
@@ -40,7 +40,7 @@ function ParseArrayIdentifiers(tokens){
 function ParseExpression(tokens){
     ParseUnaryOperators(tokens);
     ParseFunctionCalls(tokens);
-    ParseArrayIdentifiers(tokens);
+    ParseIndexIdentifiers(tokens);
     var stack = [];
     var output = [];
 
@@ -59,14 +59,14 @@ function ParseExpression(tokens){
         Call:6,
         LeftSquare:7,
         RightSquare:8,
-        ArrayIdentifier:9,
+        IndexIdentifier:9,
     };
 
     function Term(type){
         switch(type){
             case TokenType.Call: return TermType.Call;
             case TokenType.EmptyCall: return TermType.Call;
-            case TokenType.ArrayIdentifier: return TermType.ArrayIdentifier;
+            case TokenType.IndexIdentifier: return TermType.IndexIdentifier;
             case TokenType.Identifier: return TermType.Operand;
             case TokenType.Int: return TermType.Operand;
             case TokenType.Float: return TermType.Operand;
@@ -175,7 +175,7 @@ function ParseExpression(tokens){
                 }
                 break;
             }
-            case TermType.ArrayIdentifier: stack.push(t); break;
+            case TermType.IndexIdentifier: stack.push(t); break;
             case TermType.LeftSquare: stack.push(t); break;
             case TermType.RightSquare: {
                 while(true){
@@ -190,7 +190,7 @@ function ParseExpression(tokens){
                         output.push(stack.pop());
                 }
                 var top = stack[stack.length-1];
-                if(top.type == TokenType.ArrayIdentifier){
+                if(top.type == TokenType.IndexIdentifier){
                     output.push(stack.pop());
                 }
                 break;
@@ -236,7 +236,7 @@ function ParseExpression(tokens){
                 break;
             case TokenType.EmptyCall: CreateCall(t.value, []); break;
             case TokenType.Identifier: stack.push(new ASTIdentifier(t.value)); break;
-            case TokenType.ArrayIdentifier: stack.push(new ASTArrayIdentifier(t.value, stack.pop())); break;
+            case TokenType.IndexIdentifier: stack.push(new ASTIndexIdentifier(t.value, stack.pop())); break;
             case TokenType.Int: stack.push(new ASTConst(t.value, 'i32')); break;
             case TokenType.Float: stack.push(new ASTConst(t.value, 'f32')); break;
             case '=': CreateSetVariable(); break;

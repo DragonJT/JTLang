@@ -1,7 +1,7 @@
 const TokenType = {
     Call:'Call',
     EmptyCall:'EmptyCall',
-    ArrayIdentifier:'ArrayIdentifier',
+    IndexIdentifier:'IndexIdentifier',
     Identifier:'Identifier',
     Float:'Float',
     Int:'Int',

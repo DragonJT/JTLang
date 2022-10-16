@@ -17,20 +17,20 @@ class ASTComma{
     }
 }
 
-class ASTArrayIdentifier{
-    constructor(name, element){
+class ASTIndexIdentifier{
+    constructor(name, index){
         this.name = name;
-        this.element = element;
+        this.index = index;
     }
 
     Emit(wasm){
-        var elementType = this.element.GetType();
-        if(elementType != 'i32')
-            throw 'Expecting i32 for elementtype';
+        var indexType = this.index.GetType();
+        if(indexType != 'i32')
+            throw 'Expecting i32 for indextype';
         if(this.global == undefined)
-            throw "ASTArrayIdentifier Expecting global";
+            throw "ASTIndexIdentifier Expecting global";
         wasm.push(Opcode.i32_const, ...signedLEB128(this.global.id));
-        this.element.Emit(wasm);
+        this.index.Emit(wasm);
         wasm.push(Opcode.i32_const, ...signedLEB128(4));
         wasm.push(Opcode.i32_mul);
         wasm.push(Opcode.i32_add);
@@ -38,14 +38,14 @@ class ASTArrayIdentifier{
         switch(this.global.type){
             case 'i32': wasm.push(Opcode.i32_load); break;
             case 'f32': wasm.push(Opcode.f32_load); break;
-            default: throw "ASTArrayIdentifier defaulted:"+this.global.type;
+            default: throw "ASTIndexIdentifier defaulted:"+this.global.type;
         }
         //align and offset???
         wasm.push(...[0x00, 0x00]);
     }
 
     Traverse(nodes){
-        this.element.Traverse(nodes);
+        this.index.Traverse(nodes);
         nodes.push(this);
     }
 
@@ -293,6 +293,8 @@ class ASTSetVariable{
     }
 
     Emit(wasm){
+        //this.variable.SetVariable(expression);
+
         if(this.variable.local!=undefined){
             var from = this.expression.GetType();
             var to = this.variable.local.type;
@@ -584,7 +586,7 @@ class ASTFunction{
                 n.local = new Variable(-1, n.GetType());
                 locals.set(n.name, n.local);
             }
-            else if(n.constructor.name == 'ASTIdentifier' || n.constructor.name == 'ASTArrayIdentifier'){
+            else if(n.constructor.name == 'ASTIdentifier' || n.constructor.name == 'ASTIndexIdentifier'){
                 n.local = locals.get(n.name);
                 if(n.local == undefined){
                     n.global = globals.get(n.name);
