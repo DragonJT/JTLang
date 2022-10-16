@@ -17,6 +17,43 @@ class ASTComma{
     }
 }
 
+class ASTArrayIdentifier{
+    constructor(name, element){
+        this.name = name;
+        this.element = element;
+    }
+
+    Emit(wasm){
+        var elementType = this.element.GetType();
+        if(elementType != 'i32')
+            throw 'Expecting i32 for elementtype';
+        if(this.global == undefined)
+            throw "ASTArrayIdentifier Expecting global";
+        wasm.push(Opcode.i32_const, ...signedLEB128(this.global.id));
+        this.element.Emit(wasm);
+        wasm.push(Opcode.i32_const, ...signedLEB128(4));
+        wasm.push(Opcode.i32_mul);
+        wasm.push(Opcode.i32_add);
+
+        switch(this.global.type){
+            case 'i32': wasm.push(Opcode.i32_load); break;
+            case 'f32': wasm.push(Opcode.f32_load); break;
+            default: throw "ASTArrayIdentifier defaulted:"+this.global.type;
+        }
+        //align and offset???
+        wasm.push(...[0x00, 0x00]);
+    }
+
+    Traverse(nodes){
+        this.element.Traverse(nodes);
+        nodes.push(this);
+    }
+
+    GetType(){
+        return 'i32';
+    }
+}
+
 class ASTIdentifier{
     constructor(name){
         this.name = name;
@@ -28,8 +65,8 @@ class ASTIdentifier{
         }
         else{
             if(this.global == undefined)
-                throw "Expecting local or global"
-            wasm.push(Opcode.i32_const, ...unsignedLEB128(this.global.id));
+                throw "ASTIdentifier Expecting local or global"
+            wasm.push(Opcode.i32_const, ...signedLEB128(this.global.id));
             switch(this.global.type){
                 case 'i32': wasm.push(Opcode.i32_load); break;
                 case 'f32': wasm.push(Opcode.f32_load); break;
@@ -207,9 +244,13 @@ class ASTGlobalVar{
     }
 
     Emit(wasm){
-        wasm.push(Opcode.i32_const, ...signedLEB128(this.globalID));
+        wasm.push(Opcode.i32_const, ...signedLEB128(this.global.id));
         this.expression.Emit(wasm);
-        wasm.push(Opcode.f32_store);
+        switch(this.global.type){
+            case 'f32': wasm.push(Opcode.f32_store); break;
+            case 'i32': wasm.push(Opcode.i32_store); break;
+            default: throw 'ASTGlobalVar type has defaulted: '+this.global.type;
+        }
         //align and offset???
         wasm.push(...[0x00, 0x00]);
     }
@@ -543,7 +584,7 @@ class ASTFunction{
                 n.local = new Variable(-1, n.GetType());
                 locals.set(n.name, n.local);
             }
-            else if(n.constructor.name == 'ASTIdentifier'){
+            else if(n.constructor.name == 'ASTIdentifier' || n.constructor.name == 'ASTArrayIdentifier'){
                 n.local = locals.get(n.name);
                 if(n.local == undefined){
                     n.global = globals.get(n.name);

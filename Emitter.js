@@ -12,6 +12,7 @@ const Opcode = {
     get_local: 0x20,
     set_local: 0x21,
     i32_store_8: 0x3a,
+    i32_store: 0x36,
     i32_const: 0x41,
     f32_const: 0x43,
     i32_eqz: 0x45,

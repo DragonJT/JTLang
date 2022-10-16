@@ -53,6 +53,10 @@ export void Update(){
     for(x=0;x<10;x++){
         DrawCircle(100+x*50,40+y2,50,0,x/10,1);
     }
+    var i = 0;
+    for(i=0;i<5;i++){
+        DrawInt(100+i*100, 300, test[i]);
+    }
     DrawFloat(100,100,y);
     DrawFloat(100,200,y2);
 
@@ -69,6 +73,12 @@ export void Update(){
 export void main(){
     global_var y = 0.;
     global_var y2 = 300.;
+    global_var test = 3;
+    global_var test1 = 4;
+    global_var test2 = 5;
+    global_var test3 = 6;
+    global_var test4 = 7;
+
     Init();
     CallNextUpdateFunc();
 }

@@ -27,11 +27,20 @@ function ParseFunctionCalls(tokens){
     }
 }
 
+function ParseArrayIdentifiers(tokens){
+    for(var i=0;i<tokens.length-1;i++){
+        if(tokens[i].type == TokenType.Identifier && tokens[i+1].type == '['){
+            tokens[i].type = TokenType.ArrayIdentifier;
+        }
+    }
+}
+
 //shunting yard algorithm
 //https://www.andr.mu/logs/the-shunting-yard-algorithm/
 function ParseExpression(tokens){
     ParseUnaryOperators(tokens);
     ParseFunctionCalls(tokens);
+    ParseArrayIdentifiers(tokens);
     var stack = [];
     var output = [];
 
@@ -48,12 +57,16 @@ function ParseExpression(tokens){
         LeftParenthesis:4,
         RightParenthesis:5,
         Call:6,
+        LeftSquare:7,
+        RightSquare:8,
+        ArrayIdentifier:9,
     };
 
     function Term(type){
         switch(type){
             case TokenType.Call: return TermType.Call;
             case TokenType.EmptyCall: return TermType.Call;
+            case TokenType.ArrayIdentifier: return TermType.ArrayIdentifier;
             case TokenType.Identifier: return TermType.Operand;
             case TokenType.Int: return TermType.Operand;
             case TokenType.Float: return TermType.Operand;
@@ -68,6 +81,8 @@ function ParseExpression(tokens){
             case '/': return TermType.Operator;
             case '(': return TermType.LeftParenthesis;
             case ')': return TermType.RightParenthesis;
+            case '[': return TermType.LeftSquare;
+            case ']': return TermType.RightSquare;
             case ',': return TermType.Operator;
             case '<': return TermType.Operator;
             case '>': return TermType.Operator;
@@ -81,6 +96,8 @@ function ParseExpression(tokens){
             case '=': return 0;
             case '(': return 1;
             case ')': return 1;
+            case '[': return 1;
+            case ']': return 1;
             case ',': return 1;
             case '<': return 2;
             case '>': return 2;
@@ -121,7 +138,7 @@ function ParseExpression(tokens){
             case TermType.UnaryPostfixOperator: output.push(t); break;
             case TermType.UnaryPrefixOperator: stack.push(t); break;
             case TermType.Call: stack.push(t); break;
-            case TermType.Operator:
+            case TermType.Operator:{
                 var top = stack[stack.length-1];
                 var associative = Associative(t.type);
                 while(stack.length>0){
@@ -138,8 +155,9 @@ function ParseExpression(tokens){
                 }
                 stack.push(t);
                 break;
+            }
             case TermType.LeftParenthesis: stack.push(t); break;
-            case TermType.RightParenthesis:
+            case TermType.RightParenthesis:{
                 while(true){
                     if(stack.length<=0)
                         throw "Expecting to find matching () operators";
@@ -156,6 +174,27 @@ function ParseExpression(tokens){
                     output.push(stack.pop());
                 }
                 break;
+            }
+            case TermType.ArrayIdentifier: stack.push(t); break;
+            case TermType.LeftSquare: stack.push(t); break;
+            case TermType.RightSquare: {
+                while(true){
+                    if(stack.length<=0)
+                        throw "Expecting to find matching [] operators";
+                    var topType = stack[stack.length-1].type;
+                    if(topType == '['){
+                        stack.pop();
+                        break;
+                    }
+                    else
+                        output.push(stack.pop());
+                }
+                var top = stack[stack.length-1];
+                if(top.type == TokenType.ArrayIdentifier){
+                    output.push(stack.pop());
+                }
+                break;
+            }
             default:
                 throw "Term defaulted:"+term;
         }
@@ -197,6 +236,7 @@ function ParseExpression(tokens){
                 break;
             case TokenType.EmptyCall: CreateCall(t.value, []); break;
             case TokenType.Identifier: stack.push(new ASTIdentifier(t.value)); break;
+            case TokenType.ArrayIdentifier: stack.push(new ASTArrayIdentifier(t.value, stack.pop())); break;
             case TokenType.Int: stack.push(new ASTConst(t.value, 'i32')); break;
             case TokenType.Float: stack.push(new ASTConst(t.value, 'f32')); break;
             case '=': CreateSetVariable(); break;
