@@ -5,7 +5,7 @@ function ParseUnaryOperators(tokens){
     function IsTerminal(i){
         if(i<0)
             return false;
-        return (tokens[i].type == TokenType.Identifier || tokens[i].type == TokenType.Int || tokens[i].type == TokenType.Float || tokens[i].type == ')')
+        return (tokens[i].type == TokenType.Identifier || tokens[i].type == TokenType.Int || tokens[i].type == TokenType.Float || tokens[i].type == ')' || tokens[i].type == ']')
     }
 
     for(var i=0;i<tokens.length;i++){
@@ -98,17 +98,17 @@ function ParseExpression(tokens){
             case ')': return 1;
             case '[': return 1;
             case ']': return 1;
-            case ',': return 1;
-            case '<': return 2;
-            case '>': return 2;
-            case '+': return 3;
-            case '-': return 3;
-            case 'p': return 4;
-            case 'm': return 4;
-            case '*': return 5;
-            case '/': return 5;
-            case '++': return 6;
-            case '--': return 6;
+            case ',': return 2;
+            case '<': return 3;
+            case '>': return 3;
+            case '+': return 4;
+            case '-': return 4;
+            case 'p': return 5;
+            case 'm': return 5;
+            case '*': return 6;
+            case '/': return 6;
+            case '++': return 7;
+            case '--': return 7;
             default: throw "Precedence defaulted:"+type;
         }
     }
@@ -141,13 +141,14 @@ function ParseExpression(tokens){
             case TermType.Operator:{
                 var top = stack[stack.length-1];
                 var associative = Associative(t.type);
+                console.log(stack, t);
                 while(stack.length>0){
                     if(associative == AssociativeType.Left){
-                        if(!(Precedence(t.type) < Precedence(top.type)))
+                        if(!(Precedence(t.type) <= Precedence(top.type)))
                             break;
                     }
                     else{
-                        if((Precedence(t.type) <= Precedence(top.type)))
+                        if((Precedence(t.type) < Precedence(top.type)))
                             break;
                     }
                     output.push(stack.pop());

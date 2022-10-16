@@ -5,6 +5,19 @@ import void Init() #{
     canvas.width = 800;
     canvas.height = 600;
     global.ctx = canvas.getContext('2d');
+    console.log(exports.MoveHorizontal);
+    addEventListener('keydown', e=>{
+        if(e.key == 'ArrowLeft')
+            exports.KeyLeft(2);
+        if(e.key == 'ArrowRight')
+            exports.KeyRight(2);
+    });
+    addEventListener('keyup', e=>{
+        if(e.key == 'ArrowLeft')
+            exports.KeyLeft(0);
+        if(e.key == 'ArrowRight')
+            exports.KeyRight(0);
+    });
 }#
 
 import void DrawRect(f32 x, f32 y, f32 w, f32 h, f32 r, f32 g, f32 b) #{
@@ -21,63 +34,98 @@ import void DrawCircle(f32 x, f32 y, f32 radius, f32 r, f32 g, f32 b) #{
     ctx.fill();
 }#
 
-import void DrawFloat(f32 x, f32 y, f32 value) #{
+import void DrawGameOver() #{
     var ctx = global.ctx;
-    ctx.fillStyle = 'white';
-    ctx.font = '30px Arial';
-    ctx.fillText("Float:"+value, x, y);
+    ctx.fillStyle = 'red';
+    ctx.font = '200px Arial';
+    ctx.fillText("Game", 100, 200);
+    ctx.fillText("Over", 100, 400);
+
 }#
 
-import void DrawInt(f32 x, f32 y, i32 value) #{
+import void DrawTriangle(f32 x, f32 y, f32 radius, f32 r, f32 g, f32 b) #{
+    var ctx = global.ctx;
+    ctx.fillStyle = 'rgb('+r*255+','+g*255+','+b*255+')';
+    ctx.beginPath();
+    ctx.moveTo(x-radius, y+radius);
+    ctx.lineTo(x, y-radius);
+    ctx.lineTo(x+radius, y+radius);
+    ctx.fill();
+}#
+
+import void DrawSpeed(f32 x, f32 y, f32 value) #{
     var ctx = global.ctx;
     ctx.fillStyle = 'white';
     ctx.font = '30px Arial';
-    ctx.fillText("Int:"+value, x, y);
+    ctx.fillText("Speed:"+value, x, y);
 }#
 
 import void CallNextUpdateFunc() #{
     requestAnimationFrame(exports.Update);
 }#
 
+import f32 Random() #{
+    return Math.random();
+}#
+
+export void KeyLeft(f32 value){
+    keyLeft = value;
+}
+
+export void KeyRight(f32 value){
+    keyRight = value;
+}
+
 export void Update(){
     DrawRect(0,0,800,600,0,0,0);
-    DrawCircle(100,100,50,1,0,0);
-    DrawCircle(150,175,50,0,1,0);
-    DrawCircle(200,175,25,0,0,1);
-    DrawCircle(250,100,75,1,1,0);
-
-    var x = 0.;
-    for(x=0;x<10;x++){
-        DrawCircle(100+x*50,10+y,50,x/10,1,0);
-    }
-    for(x=0;x<10;x++){
-        DrawCircle(100+x*50,40+y2,50,0,x/10,1);
-    }
+    playerX = playerX - keyLeft + keyRight;
+    if(playerX<0)
+        playerX = 0;
+    if(playerX>800)
+        playerX = 800;
     var i = 0;
     for(i=0;i<5;i++){
-        DrawInt(100+i*100, 300, test[i]);
+        DrawCircle(rockX[i], rockY[i], 40, i/5.,0,1);
+        rockY[i] = rockY[i]+speed;
+        if(rockY[i]>600){
+            rockY[i] = 0;
+            rockX[i] = Random()*800;
+        }
+        if(rockX[i]>playerX-40){
+            if(rockX[i]<playerX+40){
+                if(rockY[i]>460){
+                    if(rockY[i]<540){
+                        dead=1;
+                    }
+                }
+            }
+        }
     }
-    DrawFloat(100,100,y);
-    DrawFloat(100,200,y2);
-
-    CallNextUpdateFunc();
-    y++;
-    y2=y2+1.5;
-
-    if(y>600)
-        y=0;
-    if(y2>600)
-        y2=0;
+    DrawTriangle(playerX, 500, 25, 0,1,0);
+    speed = speed + 0.0005;
+    DrawSpeed(50,50,speed);
+    if(dead<1)
+        CallNextUpdateFunc();
+    if(dead>0)
+        DrawGameOver();
 }
 
 export void main(){
-    global_var y = 0.;
-    global_var y2 = 300.;
-    global_var test = 3;
-    global_var test1 = 4;
-    global_var test2 = 5;
-    global_var test3 = 6;
-    global_var test4 = 7;
+    global_var dead = 0;
+    global_var speed = 1.;
+    global_var playerX = 400.;
+    global_var keyLeft = 0.;
+    global_var keyRight = 0.;
+    global_var rockX = Random()*800;
+    global_var rockX1 = Random()*800;
+    global_var rockX2 = Random()*800;
+    global_var rockX3 = Random()*800;
+    global_var rockX4 = Random()*800;
+    global_var rockY = Random()*600-300;
+    global_var rockY1 = Random()*600-300;
+    global_var rockY2 = Random()*600-300;
+    global_var rockY3 = Random()*600-300;
+    global_var rockY4 = Random()*600-300;
 
     Init();
     CallNextUpdateFunc();

@@ -26,9 +26,10 @@ class ASTIndexIdentifier{
     Emit(wasm){
         var indexType = this.index.GetType();
         if(indexType != 'i32')
-            throw 'Expecting i32 for indextype';
+            throw 'ASTIndexIdentifier: Emit: Expecting i32 for indextype';
         if(this.global == undefined)
-            throw "ASTIndexIdentifier Expecting global";
+            throw "ASTIndexIdentifier: Emit: Expecting global";
+
         wasm.push(Opcode.i32_const, ...signedLEB128(this.global.id));
         this.index.Emit(wasm);
         wasm.push(Opcode.i32_const, ...signedLEB128(4));
@@ -38,7 +39,7 @@ class ASTIndexIdentifier{
         switch(this.global.type){
             case 'i32': wasm.push(Opcode.i32_load); break;
             case 'f32': wasm.push(Opcode.f32_load); break;
-            default: throw "ASTIndexIdentifier defaulted:"+this.global.type;
+            default: throw "ASTIndexIdentifier: Emit: defaulted:"+this.global.type;
         }
         //align and offset???
         wasm.push(...[0x00, 0x00]);
@@ -50,7 +51,35 @@ class ASTIndexIdentifier{
     }
 
     GetType(){
-        return 'i32';
+        return this.global.type;
+    }
+
+    SetVariable(wasm, expression){
+        var indexType = this.index.GetType();
+        if(indexType != 'i32')
+            throw 'ASTIndexIdentifier: SetVariable: Expecting i32 for indextype';
+        if(this.global == undefined)
+            throw "ASTIndexIdentifier: SetVariable: Expecting global";
+
+        var from = expression.GetType();
+        var to = this.GetType();
+        if(from != to){
+            expression = new ASTImplicitConvert(from, to, expression);
+        }
+        
+        wasm.push(Opcode.i32_const, ...signedLEB128(this.global.id));
+        this.index.Emit(wasm);
+        wasm.push(Opcode.i32_const, ...signedLEB128(4));
+        wasm.push(Opcode.i32_mul);
+        wasm.push(Opcode.i32_add);
+        expression.Emit(wasm);
+        switch(to){
+            case 'i32': wasm.push(Opcode.i32_store); break;
+            case 'f32': wasm.push(Opcode.f32_store); break;
+            default: throw "ASTIndexIdentifier: SetVariable: defaulted:"+to;
+        }
+        //align and offset???
+        wasm.push(...[0x00, 0x00]);
     }
 }
 
@@ -88,6 +117,36 @@ class ASTIdentifier{
             return this.global.type;
         else
             throw "Expecting local or global";
+    }
+
+    SetVariable(wasm, expression){
+        if(this.local!=undefined){
+            var from = expression.GetType();
+            var to = this.local.type;
+            if(from!=to){
+                expression = new ASTImplicitConvert(from, to, expression);
+            }
+            expression.Emit(wasm);
+            wasm.push(Opcode.set_local, ...unsignedLEB128(this.local.id));
+        }
+        else{
+            if(this.global==undefined){
+                throw "Identifier SetVariable is not local or global";
+            }
+            var from = expression.GetType();
+            var to = this.global.type;
+            if(from!=to){
+                expression = new ASTImplicitConvert(from, to, expression);
+            }
+            wasm.push(Opcode.i32_const, ...signedLEB128(this.global.id));
+            expression.Emit(wasm);
+            switch(to){
+                case 'i32': wasm.push(Opcode.i32_store); break;
+                case 'f32': wasm.push(Opcode.f32_store); break;
+            }
+            //align and offset???
+            wasm.push(...[0x00, 0x00]);
+        }
     }
 }
 
@@ -199,6 +258,7 @@ class ASTBinaryOP{
                 return 'f32';
             }
             else{
+                console.log(this.b);
                 throw 'Cannot implicitly convert: '+inTypeA+'->'+inTypeB;
             }
         }
@@ -293,35 +353,7 @@ class ASTSetVariable{
     }
 
     Emit(wasm){
-        //this.variable.SetVariable(expression);
-
-        if(this.variable.local!=undefined){
-            var from = this.expression.GetType();
-            var to = this.variable.local.type;
-            if(from!=to){
-                this.expression = new ASTImplicitConvert(from, to, this.expression);
-            }
-            this.expression.Emit(wasm);
-            wasm.push(Opcode.set_local, ...unsignedLEB128(this.variable.local.id));
-        }
-        else{
-            if(this.variable.global==undefined){
-                throw "SetVariable is not local or global";
-            }
-            var from = this.expression.GetType();
-            var to = this.variable.global.type;
-            if(from!=to){
-                this.expression = new ASTImplicitConvert(from, to, this.expression);
-            }
-            wasm.push(Opcode.i32_const, ...signedLEB128(this.variable.global.id));
-            this.expression.Emit(wasm);
-            switch(to){
-                case 'i32': wasm.push(Opcode.i32_store); break;
-                case 'f32': wasm.push(Opcode.f32_store); break;
-            }
-            //align and offset???
-            wasm.push(...[0x00, 0x00]);
-        }
+        this.variable.SetVariable(wasm, this.expression);
     }
 
     Traverse(nodes){
@@ -574,9 +606,10 @@ class ASTFunction{
     }
 
     CalcVariables(globals){
+        var args = new Map();
         var locals = new Map();
         for(var i=0;i<this.args.length;i++){
-            locals.set(this.args[i].name, i);
+            args.set(this.args[i].name, new Variable(i, this.args[i].type));
         }
 
         for(var n of Traverse(this)){
@@ -587,11 +620,14 @@ class ASTFunction{
                 locals.set(n.name, n.local);
             }
             else if(n.constructor.name == 'ASTIdentifier' || n.constructor.name == 'ASTIndexIdentifier'){
-                n.local = locals.get(n.name);
+                n.local = args.get(n.name);
                 if(n.local == undefined){
-                    n.global = globals.get(n.name);
-                    if(n.global == undefined)
-                        throw "Variable has no declaration: "+n.name;
+                    n.local = locals.get(n.name);
+                    if(n.local == undefined){
+                        n.global = globals.get(n.name);
+                        if(n.global == undefined)
+                            throw "Variable has no declaration: "+n.name;
+                    }
                 }
             }
         }
