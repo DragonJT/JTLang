@@ -199,7 +199,50 @@ class ASTImplicitConvert{
     }
 }
 
-class ASTBinaryOP{
+class ASTLogicalOp{
+    constructor(a,b,op){
+        this.a = a;
+        this.b = b;
+        this.op = op;
+    }
+
+    Emit(wasm){
+        switch(this.op){
+            case '&&':{
+                this.a.Emit(wasm);
+                wasm.push(Opcode.if);
+                wasm.push(Blocktype.i32);
+                this.b.Emit(wasm);
+                wasm.push(Opcode.else);
+                wasm.push(Opcode.i32_const, ...signedLEB128(0));
+                wasm.push(Opcode.end);
+                break;
+            }
+            case '||':{
+                this.a.Emit(wasm);
+                wasm.push(Opcode.if);
+                wasm.push(Blocktype.i32);
+                wasm.push(Opcode.i32_const, ...signedLEB128(1));
+                wasm.push(Opcode.else);
+                this.b.Emit(wasm);
+                wasm.push(Opcode.end);
+                break;
+            }
+        }
+    }
+
+    Traverse(nodes){
+        this.a.Traverse(nodes);
+        this.b.Traverse(nodes);
+        nodes.push(this);
+    }
+
+    GetType(){
+        return 'i32';
+    }
+}
+
+class ASTBinaryOp{
     constructor(a,b,op){
         this.a=a;
         this.b=b;
@@ -451,12 +494,9 @@ class ASTIf{
     }
 
     Emit(wasm){
-        wasm.push(Opcode.block);
-        wasm.push(Blocktype.void);
         this.expression.Emit(wasm);
-        wasm.push(Opcode.i32_eqz);
-        wasm.push(Opcode.br_if);
-        wasm.push(...signedLEB128(0));
+        wasm.push(Opcode.if);
+        wasm.push(Blocktype.void);
         this.body.Emit(wasm);
         wasm.push(Opcode.end);
     }

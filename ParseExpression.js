@@ -86,6 +86,8 @@ function ParseExpression(tokens){
             case ',': return TermType.Operator;
             case '<': return TermType.Operator;
             case '>': return TermType.Operator;
+            case '&&': return TermType.Operator;
+            case '||': return TermType.Operator;
             default: 
                 throw "Type defaulted:"+type;
         }
@@ -99,16 +101,18 @@ function ParseExpression(tokens){
             case '[': return 1;
             case ']': return 1;
             case ',': return 2;
-            case '<': return 3;
-            case '>': return 3;
-            case '+': return 4;
-            case '-': return 4;
-            case 'p': return 5;
-            case 'm': return 5;
-            case '*': return 6;
-            case '/': return 6;
-            case '++': return 7;
-            case '--': return 7;
+            case '&&': return 3;
+            case '||': return 3;
+            case '<': return 4;
+            case '>': return 4;
+            case '+': return 5;
+            case '-': return 5;
+            case 'p': return 6;
+            case 'm': return 6;
+            case '*': return 7;
+            case '/': return 7;
+            case '++': return 8;
+            case '--': return 8;
             default: throw "Precedence defaulted:"+type;
         }
     }
@@ -127,6 +131,8 @@ function ParseExpression(tokens){
             case ',': return AssociativeType.Left;
             case '<': return AssociativeType.Left;
             case '>': return AssociativeType.Left;
+            case '&&': return AssociativeType.Left;
+            case '||': return AssociativeType.Left;
             default: throw "Associative defaulted:"+type;
         }
     }
@@ -141,7 +147,6 @@ function ParseExpression(tokens){
             case TermType.Operator:{
                 var top = stack[stack.length-1];
                 var associative = Associative(t.type);
-                console.log(stack, t);
                 while(stack.length>0){
                     if(associative == AssociativeType.Left){
                         if(!(Precedence(t.type) <= Precedence(top.type)))
@@ -207,7 +212,13 @@ function ParseExpression(tokens){
     function CreateBinaryOp(op){
         var b = stack.pop();
         var a = stack.pop();
-        stack.push(new ASTBinaryOP(a,b,op))
+        stack.push(new ASTBinaryOp(a,b,op));
+    }
+
+    function CreateLogicalOp(op){
+        var b = stack.pop();
+        var a = stack.pop();
+        stack.push(new ASTLogicalOp(a,b,op))
     }
 
     function CreateUnaryOp(op){
@@ -251,6 +262,8 @@ function ParseExpression(tokens){
             case '--': CreateUnaryOp('--'); break;
             case '<': CreateBinaryOp('<'); break;
             case '>': CreateBinaryOp('>'); break;
+            case '&&': CreateLogicalOp('&&'); break;
+            case '||': CreateLogicalOp('||'); break;
             case ',': commas++; break;
             default: throw "opcodes defaulted:"+t.type;
         }

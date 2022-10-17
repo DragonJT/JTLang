@@ -38,8 +38,8 @@ import void DrawGameOver() #{
     var ctx = global.ctx;
     ctx.fillStyle = 'red';
     ctx.font = '200px Arial';
-    ctx.fillText("Game", 100, 200);
-    ctx.fillText("Over", 100, 400);
+    ctx.fillText("GAME", 100, 200);
+    ctx.fillText("OVER", 100, 400);
 
 }#
 
@@ -91,15 +91,8 @@ export void Update(){
             rockY[i] = 0;
             rockX[i] = Random()*800;
         }
-        if(rockX[i]>playerX-40){
-            if(rockX[i]<playerX+40){
-                if(rockY[i]>460){
-                    if(rockY[i]<540){
-                        dead=1;
-                    }
-                }
-            }
-        }
+        if(rockX[i]>playerX-40 && rockX[i]<playerX+40 && rockY[i]>460 && rockY[i]<540)
+            dead=1;
     }
     DrawTriangle(playerX, 500, 25, 0,1,0);
     speed = speed + 0.0005;

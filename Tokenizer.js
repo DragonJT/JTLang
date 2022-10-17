@@ -18,7 +18,7 @@ class Token{
 function Tokenizer(code){
     var index = 0;
     var charTokens = new Set(['=','+','-','*','/','<','>',';','(',')','{','}',',','[',']']);
-    var char2Tokens = new Set(['++', '--']);
+    var char2Tokens = new Set(['++', '--', '&&', '||']);
     var keywords = new Set(['if', 'while', 'for', 'return', 'import', 'export', 'var', 'global_var']);
 
     function IsDigit(c){

@@ -83,7 +83,7 @@ function Parser(reader){
     function ParseIf(){
         Expect('if');
         Expect('(');
-        var expression = ParseExpression(ParseExpressionTokens(')'));
+        var expression = ParseExpression(ParseExpressionTokens('(', ')'));
         var body = ParseStatement();
         return new ASTIf(expression, body);
     }
@@ -91,7 +91,7 @@ function Parser(reader){
     function ParseWhile(){
         Expect('while');
         Expect('(');
-        var expression = ParseExpression(ParseExpressionTokens(')'));
+        var expression = ParseExpression(ParseExpressionTokens('(', ')'));
         var body = ParseStatement();
         return new ASTWhile(expression, body);
     }
@@ -99,9 +99,9 @@ function Parser(reader){
     function ParseFor(){
         Expect('for');
         Expect('(');
-        var init = ParseExpression(ParseExpressionTokens(';'));
-        var condition = ParseExpression(ParseExpressionTokens(';'));
-        var post = ParseExpression(ParseExpressionTokens(')'));
+        var init = ParseExpression(ParseExpressionTokens(undefined, ';'));
+        var condition = ParseExpression(ParseExpressionTokens(undefined, ';'));
+        var post = ParseExpression(ParseExpressionTokens('(', ')'));
         var body = ParseStatement();
         return new ASTFor(init, condition, post, body);
     }
@@ -110,7 +110,7 @@ function Parser(reader){
         Expect('var');
         var name = Expect('Identifier');
         Expect('=');
-        var expression = ParseExpression(ParseExpressionTokens(';'));
+        var expression = ParseExpression(ParseExpressionTokens(undefined, ';'));
         return new ASTVar(name, expression);
     }
 
@@ -118,7 +118,7 @@ function Parser(reader){
         Expect('global_var');
         var name = Expect('Identifier');
         Expect('=');
-        var expression = ParseExpression(ParseExpressionTokens(';'));
+        var expression = ParseExpression(ParseExpressionTokens(undefined, ';'));
         return new ASTGlobalVar(name, expression);
     }
 
@@ -131,18 +131,26 @@ function Parser(reader){
             case 'if': return ParseIf();
             case 'while': return ParseWhile();
             case 'for': return ParseFor();
-            default: return ParseExpression(ParseExpressionTokens(';'));
+            default: return ParseExpression(ParseExpressionTokens(undefined, ';'));
         }
     }
 
-    function ParseExpressionTokens(end){
+    function ParseExpressionTokens(indentor, end){
         var start = reader.index;
+        var indent = 0;
         while(true){
             NotExpectingEndOfInput(end)
             if(reader.current.type == end){
-                var tokens = reader.tokens.slice(start, reader.index);
+                indent--;
                 reader.Scan();
-                return tokens;
+                if(indent<0){
+                    var tokens = reader.tokens.slice(start, reader.index-1);
+                    return tokens;
+                }
+            }
+            else if(reader.current.type == indentor){
+                indent++;
+                reader.Scan();
             }
             else
                 reader.Scan();

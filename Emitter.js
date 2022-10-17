@@ -7,6 +7,8 @@ const Opcode = {
     loop: 0x03,
     br: 0x0c,
     br_if: 0x0d,
+    if: 0x04,
+    else: 0x05,
     end: 0x0b,
     call: 0x10,
     get_local: 0x20,
@@ -92,8 +94,10 @@ const unsignedLEB128 = (n) => {
 };
 
 // https://webassembly.github.io/spec/core/binary/types.html#binary-blocktype
+// https://github.com/WebAssembly/design/blob/main/BinaryEncoding.md#value_type
 const Blocktype = {
-    void: 0x40
+    void: 0x40,
+    i32: 0x7f,
 }
 
 function EmitAndRun(ast, output){
