@@ -103,23 +103,23 @@ export void Update(){
         DrawGameOver();
 }
 
-export void main(){
-    global_var dead = 0;
-    global_var speed = 1.;
-    global_var playerX = 400.;
-    global_var keyLeft = 0.;
-    global_var keyRight = 0.;
-    global_var rockX = Random()*800;
-    global_var rockX1 = Random()*800;
-    global_var rockX2 = Random()*800;
-    global_var rockX3 = Random()*800;
-    global_var rockX4 = Random()*800;
-    global_var rockY = Random()*600-300;
-    global_var rockY1 = Random()*600-300;
-    global_var rockY2 = Random()*600-300;
-    global_var rockY3 = Random()*600-300;
-    global_var rockY4 = Random()*600-300;
+var dead = 0;
+var speed = 1.;
+var playerX = 400.;
+var keyLeft = 0.;
+var keyRight = 0.;
+var rockX = Random()*800;
+var rockX1 = Random()*800;
+var rockX2 = Random()*800;
+var rockX3 = Random()*800;
+var rockX4 = Random()*800;
+var rockY = Random()*600-300;
+var rockY1 = Random()*600-300;
+var rockY2 = Random()*600-300;
+var rockY3 = Random()*600-300;
+var rockY4 = Random()*600-300;
 
+export void main(){
     Init();
     CallNextUpdateFunc();
 }

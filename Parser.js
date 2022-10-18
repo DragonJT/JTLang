@@ -79,7 +79,6 @@ function Parser(reader){
         }
     }
 
-
     function ParseIf(){
         Expect('if');
         Expect('(');
@@ -106,26 +105,31 @@ function Parser(reader){
         return new ASTFor(init, condition, post, body);
     }
 
+    function ParseArrayInitializer(){
+        Expect('array');
+        Expect('(');
+        var size = Expect(TokenType.Int);
+        Expect(')');
+        var body = ParseBody();
+        return new ASTArrayInitializer(size, body);
+    }
+
     function ParseVar(){
         Expect('var');
         var name = Expect('Identifier');
-        Expect('=');
-        var expression = ParseExpression(ParseExpressionTokens(undefined, ';'));
-        return new ASTVar(name, expression);
-    }
-
-    function ParseGlobalVar(){
-        Expect('global_var');
-        var name = Expect('Identifier');
-        Expect('=');
-        var expression = ParseExpression(ParseExpressionTokens(undefined, ';'));
-        return new ASTGlobalVar(name, expression);
+        Expect('=');  
+        NotExpectingEndOfInput('array, expression');
+        var value = undefined;
+        switch(reader.current.type){
+            case 'array': value = ParseArrayInitializer(); break;
+            default: value = ParseExpression(ParseExpressionTokens(undefined, ';')); break;
+        }  
+        return new ASTVar(name, value);
     }
 
     function ParseStatement(){
         NotExpectingEndOfInput('statement');
         switch(reader.current.type){
-            case 'global_var': return ParseGlobalVar();
             case 'var': return ParseVar();
             case '{': return ParseBody();
             case 'if': return ParseIf();
@@ -185,6 +189,7 @@ function Parser(reader){
             if(reader.current == undefined)
                 return new AST(body);
             switch(reader.current.type){
+                case 'var': body.push(ParseVar()); break;
                 case TokenType.Identifier: body.push(ParseFunction(false)); break;
                 case 'import': body.push(ParseImportFunction()); break;
                 case 'export': body.push(ParseExportFunction()); break;

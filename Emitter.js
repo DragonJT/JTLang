@@ -248,6 +248,13 @@ function EmitAndRun(ast, output){
 
     function EmitFunction(f){
         var wasm = [];
+        if(f.name == 'main'){
+            for(var n of ast.body){
+                if(n.constructor.name == 'ASTVar'){
+                    n.EmitGlobal(wasm);
+                }
+            }
+        }
         f.body.Emit(wasm);
         var locals = [];
         if(f.f32LocalCount>0){

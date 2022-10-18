@@ -340,15 +340,22 @@ class ASTBody{
     }
 }
 
-class ASTGlobalVar{
-    constructor(name, expression){
+class ASTArrayInitializer{
+    constructor(size, body){
+        this.size = size;
+        this.body = body;
+    }
+}
+
+class ASTVar{
+    constructor(name, value){
         this.name = name;
-        this.expression = expression;
+        this.value = value;
     }
 
-    Emit(wasm){
+    EmitGlobal(wasm){
         wasm.push(Opcode.i32_const, ...signedLEB128(this.global.id));
-        this.expression.Emit(wasm);
+        this.value.Emit(wasm);
         switch(this.global.type){
             case 'f32': wasm.push(Opcode.f32_store); break;
             case 'i32': wasm.push(Opcode.i32_store); break;
@@ -358,33 +365,17 @@ class ASTGlobalVar{
         wasm.push(...[0x00, 0x00]);
     }
 
-    GetType(){
-        return this.expression.GetType();
-    }
-
-    Traverse(nodes){
-        this.expression.Traverse(nodes);
-        nodes.push(this);
-    }
-}
-
-class ASTVar{
-    constructor(name, expression){
-        this.name = name;
-        this.expression = expression;
-    }
-
     Emit(wasm){
-        this.expression.Emit(wasm);
+        this.value.Emit(wasm);
         wasm.push(Opcode.set_local, ...unsignedLEB128(this.local.id));
     }
 
     GetType(){
-        return this.expression.GetType();
+        return this.value.GetType();
     }
 
     Traverse(nodes){
-        this.expression.Traverse(nodes);
+        this.value.Traverse(nodes);
         nodes.push(this);
     }
 }
@@ -722,8 +713,8 @@ class AST{
     CalcVariables(){
         var globals = new Map();
 
-        for(var n of Traverse(this)){
-            if(n.constructor.name == 'ASTGlobalVar'){
+        for(var n of this.body){
+            if(n.constructor.name == 'ASTVar'){
                 if(globals.has(n.name))
                     throw "Globals already contains var: "+v.name;
                 n.global = new Variable(globals.size*4, n.GetType());
