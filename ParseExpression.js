@@ -73,6 +73,7 @@ function ParseExpression(tokens){
             case '++': return TermType.UnaryPostfixOperator;
             case '--': return TermType.UnaryPostfixOperator
             case '=': return TermType.Operator;
+            case ':=': return TermType.Operator;
             case '+': return TermType.Operator;
             case '-': return TermType.Operator;
             case 'p': return TermType.UnaryPrefixOperator;
@@ -95,6 +96,7 @@ function ParseExpression(tokens){
 
     function Precedence(type){
         switch(type){
+            case ':=': return 0;
             case '=': return 0;
             case '(': return 1;
             case ')': return 1;
@@ -121,6 +123,7 @@ function ParseExpression(tokens){
         switch(type){
             case '++': return AssociativeType.Left;
             case '--': return AssociativeType.Left;
+            case ':=': return AssociativeType.Left;
             case '=': return AssociativeType.Left;
             case '+': return AssociativeType.Left;
             case '-': return AssociativeType.Left;
@@ -231,6 +234,13 @@ function ParseExpression(tokens){
         stack.push(new ASTSetVariable(variable, expression));
     }
 
+    function CreateCreateVariable(){
+        var expression = stack.pop();
+        var variable = stack.pop();
+        stack.push(new ASTCreateVariable(variable.name, expression));
+    }
+
+
     function CreateCall(name, args){        
         stack.push(new ASTCall(name, args));
     }
@@ -252,6 +262,7 @@ function ParseExpression(tokens){
             case TokenType.Int: stack.push(new ASTConst(t.value, 'i32')); break;
             case TokenType.Float: stack.push(new ASTConst(t.value, 'f32')); break;
             case '=': CreateSetVariable(); break;
+            case ':=': CreateCreateVariable(); break;
             case '*': CreateBinaryOp('*'); break;
             case '/': CreateBinaryOp('/'); break;
             case '+': CreateBinaryOp('+'); break;

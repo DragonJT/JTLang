@@ -66,6 +66,31 @@ function Parser(reader){
             Error('typename )');
     }
 
+    function ParseDynamicArgs(){
+        Expect('(');
+        var args = [];
+        NotExpectingEndOfInput('name )')
+        while(reader.current.type == TokenType.Identifier){
+            var name = Expect(TokenType.Identifier);
+            args.push(new ASTArg('?', name));
+            NotExpectingEndOfInput(', )')
+            if(reader.current.type == ','){
+                reader.Scan();
+            }
+            else if(reader.current.type == ')'){
+                break;
+            }
+            else 
+                Error('typename , )');
+        }
+        if(reader.current.type == ')'){
+            reader.Scan();
+            return args;
+        }
+        else
+            Error('typename )');
+    }
+
     function ParseBody(){
         Expect('{');
         var statements = [];
@@ -107,30 +132,30 @@ function Parser(reader){
 
     function ParseArrayInitializer(){
         Expect('array');
+        Expect('<');
+        var type = Expect('Identifier');
+        Expect('>');
         Expect('(');
-        var size = Expect(TokenType.Int);
+        var size = parseInt(Expect(TokenType.Int));
         Expect(')');
         var body = ParseBody();
-        return new ASTArrayInitializer(size, body);
+        return new ASTArrayInitializer(type, size, body);
     }
 
-    function ParseVar(){
-        Expect('var');
-        var name = Expect('Identifier');
-        Expect('=');  
+    function ParseVar(name){
+        Expect(':=');  
         NotExpectingEndOfInput('array, expression');
         var value = undefined;
         switch(reader.current.type){
             case 'array': value = ParseArrayInitializer(); break;
             default: value = ParseExpression(ParseExpressionTokens(undefined, ';')); break;
         }  
-        return new ASTVar(name, value);
+        return new ASTCreateVariable(name, value);
     }
 
     function ParseStatement(){
         NotExpectingEndOfInput('statement');
         switch(reader.current.type){
-            case 'var': return ParseVar();
             case '{': return ParseBody();
             case 'if': return ParseIf();
             case 'while': return ParseWhile();
@@ -161,12 +186,10 @@ function Parser(reader){
         }
     }
 
-    function ParseFunction(_export){
-        var returnType = Expect(TokenType.Identifier);
-        var name = Expect(TokenType.Identifier);
-        var args = ParseArgs();
+    function ParseFunction(name){
+        var args = ParseDynamicArgs();
         var body = ParseBody();
-        return new ASTFunction(_export, name, args, returnType, body);
+        return new ASTFunction(false, name, args, '?', body);
     }
 
     function ParseImportFunction(){
@@ -180,7 +203,21 @@ function Parser(reader){
 
     function ParseExportFunction(){
         Expect('export');
-        return ParseFunction(true);
+        var returnType = Expect(TokenType.Identifier);
+        var name = Expect(TokenType.Identifier);
+        var args = ParseArgs();
+        var body = ParseBody();
+        return new ASTFunction(true, name, args, returnType, body);
+    }
+
+    function ParseIdentifier(){
+        var name = Expect('Identifier');
+        NotExpectingEndOfInput(':= , (')
+        switch(reader.current.type){
+            case ':=': return ParseVar(name);
+            case '(': return ParseFunction(name);
+            default: throw "ParseIdentifier defaulted";
+        }
     }
 
     function ParseAST(){
@@ -189,8 +226,7 @@ function Parser(reader){
             if(reader.current == undefined)
                 return new AST(body);
             switch(reader.current.type){
-                case 'var': body.push(ParseVar()); break;
-                case TokenType.Identifier: body.push(ParseFunction(false)); break;
+                case TokenType.Identifier: body.push(ParseIdentifier()); break;
                 case 'import': body.push(ParseImportFunction()); break;
                 case 'export': body.push(ParseExportFunction()); break;
                 default: Error(TokenType.Identifier);

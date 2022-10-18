@@ -250,7 +250,7 @@ function EmitAndRun(ast, output){
         var wasm = [];
         if(f.name == 'main'){
             for(var n of ast.body){
-                if(n.constructor.name == 'ASTVar'){
+                if(n.constructor.name == 'ASTCreateVariable'){
                     n.EmitGlobal(wasm);
                 }
             }

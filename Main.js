@@ -83,8 +83,7 @@ export void Update(){
         playerX = 0;
     if(playerX>800)
         playerX = 800;
-    var i = 0;
-    for(i=0;i<5;i++){
+    for(i := 0; i < 10 ; i++){
         DrawCircle(rockX[i], rockY[i], 40, i/5.,0,1);
         rockY[i] = rockY[i]+speed;
         if(rockY[i]>600){
@@ -103,27 +102,21 @@ export void Update(){
         DrawGameOver();
 }
 
-var dead = 0;
-var speed = 1.;
-var playerX = 400.;
-var keyLeft = 0.;
-var keyRight = 0.;
-var rockX = Random()*800;
-var rockX1 = Random()*800;
-var rockX2 = Random()*800;
-var rockX3 = Random()*800;
-var rockX4 = Random()*800;
-var rockY = Random()*600-300;
-var rockY1 = Random()*600-300;
-var rockY2 = Random()*600-300;
-var rockY3 = Random()*600-300;
-var rockY4 = Random()*600-300;
+dead := 0;
+speed := 1.;
+playerX := 400.;
+keyLeft := 0.;
+keyRight := 0.;
+rockX := array<f32>(10){ Random()*800; }
+rockY := array<f32>(10){ Random()*600; }
 
 export void main(){
     Init();
     CallNextUpdateFunc();
 }
 `;
+
+
 
 var div= document.createElement('div');
 document.body.appendChild(div);

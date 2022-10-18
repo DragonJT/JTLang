@@ -1,3 +1,14 @@
+class Type{
+    constructor(name, size){
+        this.name = name;
+        this.size = size;
+    }
+
+    IsArray(){
+        return this.size!=undefined;
+    }
+}
+
 
 class ASTComma{
     constructor(a,b){
@@ -25,7 +36,7 @@ class ASTIndexIdentifier{
 
     Emit(wasm){
         var indexType = this.index.GetType();
-        if(indexType != 'i32')
+        if(indexType.name != 'i32')
             throw 'ASTIndexIdentifier: Emit: Expecting i32 for indextype';
         if(this.global == undefined)
             throw "ASTIndexIdentifier: Emit: Expecting global";
@@ -35,8 +46,7 @@ class ASTIndexIdentifier{
         wasm.push(Opcode.i32_const, ...signedLEB128(4));
         wasm.push(Opcode.i32_mul);
         wasm.push(Opcode.i32_add);
-
-        switch(this.global.type){
+        switch(this.global.type.name){
             case 'i32': wasm.push(Opcode.i32_load); break;
             case 'f32': wasm.push(Opcode.f32_load); break;
             default: throw "ASTIndexIdentifier: Emit: defaulted:"+this.global.type;
@@ -51,19 +61,19 @@ class ASTIndexIdentifier{
     }
 
     GetType(){
-        return this.global.type;
+        return new Type(this.global.type.name);
     }
 
     SetVariable(wasm, expression){
         var indexType = this.index.GetType();
-        if(indexType != 'i32')
+        if(indexType.name != 'i32')
             throw 'ASTIndexIdentifier: SetVariable: Expecting i32 for indextype';
         if(this.global == undefined)
             throw "ASTIndexIdentifier: SetVariable: Expecting global";
 
         var from = expression.GetType();
         var to = this.GetType();
-        if(from != to){
+        if(from.name != to.name){
             expression = new ASTImplicitConvert(from, to, expression);
         }
         
@@ -73,7 +83,7 @@ class ASTIndexIdentifier{
         wasm.push(Opcode.i32_mul);
         wasm.push(Opcode.i32_add);
         expression.Emit(wasm);
-        switch(to){
+        switch(to.name){
             case 'i32': wasm.push(Opcode.i32_store); break;
             case 'f32': wasm.push(Opcode.f32_store); break;
             default: throw "ASTIndexIdentifier: SetVariable: defaulted:"+to;
@@ -96,7 +106,7 @@ class ASTIdentifier{
             if(this.global == undefined)
                 throw "ASTIdentifier Expecting local or global"
             wasm.push(Opcode.i32_const, ...signedLEB128(this.global.id));
-            switch(this.global.type){
+            switch(this.global.type.name){
                 case 'i32': wasm.push(Opcode.i32_load); break;
                 case 'f32': wasm.push(Opcode.f32_load); break;
                 default: throw "ASTIdentifier defaulted:"+this.global.type;
@@ -123,7 +133,7 @@ class ASTIdentifier{
         if(this.local!=undefined){
             var from = expression.GetType();
             var to = this.local.type;
-            if(from!=to){
+            if(from.name!=to.name){
                 expression = new ASTImplicitConvert(from, to, expression);
             }
             expression.Emit(wasm);
@@ -135,14 +145,15 @@ class ASTIdentifier{
             }
             var from = expression.GetType();
             var to = this.global.type;
-            if(from!=to){
+            if(from.name!=to.name){
                 expression = new ASTImplicitConvert(from, to, expression);
             }
             wasm.push(Opcode.i32_const, ...signedLEB128(this.global.id));
             expression.Emit(wasm);
-            switch(to){
+            switch(to.name){
                 case 'i32': wasm.push(Opcode.i32_store); break;
                 case 'f32': wasm.push(Opcode.f32_store); break;
+                default: throw 'Identifier SetVariable defaulted';
             }
             //align and offset???
             wasm.push(...[0x00, 0x00]);
@@ -169,7 +180,7 @@ class ASTConst{
     }
 
     GetType(){
-        return this.type;
+        return new Type(this.type);
     }
 }
 
@@ -182,7 +193,7 @@ class ASTImplicitConvert{
 
     Emit(wasm){
         this.expression.Emit(wasm);
-        var conversion = this.from+'->'+this.to;
+        var conversion = this.from.name+'->'+this.to.name;
         switch(conversion){
             case 'i32->f32': wasm.push(Opcode.f32_convert_i32_s); break;
             default: throw 'No implicit conversion: '+conversion;
@@ -238,7 +249,7 @@ class ASTLogicalOp{
     }
 
     GetType(){
-        return 'i32';
+        return new Type('i32');
     }
 }
 
@@ -253,7 +264,7 @@ class ASTBinaryOp{
         var opType = this.GetOpType();
         this.a.Emit(wasm);
         this.b.Emit(wasm);
-        switch(opType){
+        switch(opType.name){
             case 'f32':{
                 switch(this.op){
                     case '*': wasm.push(Opcode.f32_mul); break;
@@ -278,6 +289,8 @@ class ASTBinaryOp{
                 }
                 break;
             }
+            default:
+                throw "BinaryOp optype defaulted"+ opType.name;
         }
         
     }
@@ -291,18 +304,17 @@ class ASTBinaryOp{
     GetOpType(){
         var inTypeA = this.a.GetType();
         var inTypeB = this.b.GetType();
-        if(inTypeA != inTypeB){
-            if(inTypeA == 'f32' && inTypeB == 'i32'){
-                this.b = new ASTImplicitConvert('i32', 'f32', this.b);
-                return 'f32';
+        if(inTypeA.name != inTypeB.name){
+            if(inTypeA.name == 'f32' && inTypeB.name == 'i32'){
+                this.b = new ASTImplicitConvert(inTypeB, inTypeA, this.b);
+                return new Type('f32');
             }
-            else if(inTypeA == 'i32' && inTypeB == 'f32'){
-                this.a = new ASTImplicitConvert('i32', 'f32', this.a);
-                return 'f32';
+            else if(inTypeA.name == 'i32' && inTypeB.name == 'f32'){
+                this.a = new ASTImplicitConvert(inTypeA, inTypeB, this.a);
+                return new Type('f32');
             }
             else{
-                console.log(this.b);
-                throw 'Cannot implicitly convert: '+inTypeA+'->'+inTypeB;
+                throw 'Cannot implicitly convert: '+inTypeA.name+'->'+inTypeB.name;
             }
         }
         return inTypeA;
@@ -315,8 +327,8 @@ class ASTBinaryOp{
             case '/': return opType;
             case '+': return opType;
             case '-': return opType;
-            case '<': return 'i32';
-            case '>': return 'i32';
+            case '<': return new Type('i32');
+            case '>': return new Type('i32');
             default: throw "BinaryOp GetType defaulted: "+this.op;
         }
     }
@@ -341,28 +353,62 @@ class ASTBody{
 }
 
 class ASTArrayInitializer{
-    constructor(size, body){
+    constructor(elementType, size, body){
+        this.elementType = elementType;
         this.size = size;
         this.body = body;
     }
+
+    Traverse(nodes){
+        this.body.Traverse(nodes);
+        nodes.push(this);
+    }
+
+    EmitGlobal(wasm, global, opcode){
+        for(var i=0;i<this.size;i++){
+            wasm.push(Opcode.i32_const, ...signedLEB128(global.id+i*4));
+            this.body.Emit(wasm);
+            wasm.push(opcode);
+            //align and offset???
+            wasm.push(...[0x00, 0x00]);
+        }
+    }
+
+    GetType(){
+        return new Type(this.elementType, this.size);
+    }
 }
 
-class ASTVar{
+class ASTCreateVariable{
     constructor(name, value){
         this.name = name;
         this.value = value;
     }
 
-    EmitGlobal(wasm){
+    EmitPrimitive(wasm, opcode){
         wasm.push(Opcode.i32_const, ...signedLEB128(this.global.id));
         this.value.Emit(wasm);
-        switch(this.global.type){
-            case 'f32': wasm.push(Opcode.f32_store); break;
-            case 'i32': wasm.push(Opcode.i32_store); break;
-            default: throw 'ASTGlobalVar type has defaulted: '+this.global.type;
-        }
+        wasm.push(opcode);
         //align and offset???
         wasm.push(...[0x00, 0x00]);
+    }
+
+    EmitGlobal(wasm){
+        if(this.global.type.IsArray()){
+            switch(this.global.type.name){
+                case 'f32': this.value.EmitGlobal(wasm, this.global, Opcode.f32_store); break;
+                case 'i32': this.value.EmitGlobal(wasm, this.global, Opcode.i32_store); break;
+                default: 'Array CreateVariable EmitGlobal defaulted';
+            }
+        }
+        else{
+            switch(this.global.type.name){
+                case 'f32': this.EmitPrimitive(wasm, Opcode.f32_store); break;
+                case 'i32': this.EmitPrimitive(wasm, Opcode.i32_store); break;
+                default: 'Primitive CreateVariable EmitGlobal defaulted';
+            }
+        }
+        
     }
 
     Emit(wasm){
@@ -433,7 +479,7 @@ class ASTUnaryOp{
     }
 
     Emit(wasm){
-        switch(this.GetType()){
+        switch(this.GetType().name){
             case 'i32':{
                 switch(this.op){
                     case 'p': break;
@@ -574,8 +620,8 @@ class ASTCall{
             throw "wrong number of arguments: "+this.name;
         for(var i=0;i<this.args.length;i++){
             var from = this.args[i].GetType();
-            var to = this.func.args[i].type;
-            if(from != to){
+            var to = new Type(this.func.args[i].type);
+            if(from.name != to.name){
                 this.args[i] = new ASTImplicitConvert(from, to, this.args[i]);
             }
         }
@@ -585,7 +631,7 @@ class ASTCall{
     }
 
     GetType(){
-        return this.func.returnType;
+        return new Type(this.func.returnType);
     }
 
     Traverse(nodes){
@@ -640,11 +686,11 @@ class ASTFunction{
         var args = new Map();
         var locals = new Map();
         for(var i=0;i<this.args.length;i++){
-            args.set(this.args[i].name, new Variable(i, this.args[i].type));
+            args.set(this.args[i].name, new Variable(i, new Type(this.args[i].type)));
         }
 
         for(var n of Traverse(this)){
-            if(n.constructor.name == 'ASTVar'){
+            if(n.constructor.name == 'ASTCreateVariable'){
                 if(locals.has(n.name))
                     throw "Local already found:"+n.name;
                 n.local = new Variable(-1, n.GetType());
@@ -665,7 +711,7 @@ class ASTFunction{
         var id = this.args.length;
         this.f32LocalCount = 0;
         for(var l of locals.values()){
-            if(l.type == 'f32'){
+            if(l.type.name == 'f32'){
                 l.id = id;
                 id++;
                 this.f32LocalCount++;
@@ -673,7 +719,7 @@ class ASTFunction{
         }
         this.i32LocalCount = 0;
         for(var l of locals.values()){
-            if(l.type == 'i32'){
+            if(l.type.name == 'i32'){
                 l.id = id;
                 id++;
                 this.i32LocalCount++;
@@ -695,15 +741,15 @@ class AST{
         for(var i=0;i<functions.length;i++)
             functions[i].funcID = i+importFunctions.length;
         
-        var funcs = new Map();
+        var funcMap = new Map();
         for(var f of importFunctions)
-            funcs.set(f.name, f);
+            funcMap.set(f.name, f);
         for(var f of functions)
-            funcs.set(f.name, f);
+            funcMap.set(f.name, f);
 
         for(var n of Traverse(this)){
             if(n.constructor.name == 'ASTCall' || n.constructor.name == 'ASTEmptyCall'){
-                n.func = funcs.get(n.name);
+                n.func = funcMap.get(n.name);
                 if(n.func == undefined)
                     throw "Calling Unknown function: "+n.name;
             }
@@ -712,13 +758,19 @@ class AST{
 
     CalcVariables(){
         var globals = new Map();
-
+        var id = 0;
         for(var n of this.body){
-            if(n.constructor.name == 'ASTVar'){
+            if(n.constructor.name == 'ASTCreateVariable'){
                 if(globals.has(n.name))
                     throw "Globals already contains var: "+v.name;
-                n.global = new Variable(globals.size*4, n.GetType());
+                var type = n.GetType();
+                n.global = new Variable(id, type);
                 globals.set(n.name, n.global);
+                
+                if(type.IsArray())
+                    id+=parseInt(type.size*4);
+                else
+                    id+=4;
             }
         }
 
